@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
 using System.Windows.Forms;
 using ExemploAssinadorXML.Models;
 using ExemploAssinadorXML.Services;
@@ -21,10 +22,14 @@ namespace ExemploAssinadorXML.Forms
         private ListBox lstLotes;
         private Button btnAtualizarLotes;
         private Button btnGerarFechamento;
+        private DateTimePicker dtpFiltroData;
+        private Label lblFiltroData;
+        private CheckBox chkUsarFiltroData;
 
         private GroupBox grpDetalhes;
         private RichTextBox rtbDetalhes;
         private List<LoteInfo> lotesCarregados;
+        private List<LoteBancoInfo> lotesBancoCarregados;
 
         public ConfiguracaoForm ConfigForm { get; set; }
 
@@ -73,11 +78,37 @@ namespace ExemploAssinadorXML.Forms
             grpLotes = new GroupBox();
             grpLotes.Text = "Lotes Processados";
             grpLotes.Location = new Point(10, 170);
-            grpLotes.Size = new Size(350, 300);
+            grpLotes.Size = new Size(350, 350);
             grpLotes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
 
+            // Filtro de data
+            chkUsarFiltroData = new CheckBox();
+            chkUsarFiltroData.Text = "Filtrar por data";
+            chkUsarFiltroData.Location = new Point(10, 25);
+            chkUsarFiltroData.Size = new Size(120, 20);
+            chkUsarFiltroData.Checked = true; // Por padrão, filtrar por hoje
+
+            lblFiltroData = new Label();
+            lblFiltroData.Text = "Data:";
+            lblFiltroData.Location = new Point(10, 50);
+            lblFiltroData.Size = new Size(50, 20);
+
+            dtpFiltroData = new DateTimePicker();
+            dtpFiltroData.Location = new Point(65, 47);
+            dtpFiltroData.Size = new Size(120, 23);
+            dtpFiltroData.Format = DateTimePickerFormat.Short;
+            dtpFiltroData.Value = DateTime.Today;
+            dtpFiltroData.Enabled = chkUsarFiltroData.Checked;
+            chkUsarFiltroData.CheckedChanged += (s, e) => dtpFiltroData.Enabled = chkUsarFiltroData.Checked;
+
+            Button btnFiltrar = new Button();
+            btnFiltrar.Text = "Filtrar";
+            btnFiltrar.Location = new Point(190, 46);
+            btnFiltrar.Size = new Size(80, 25);
+            btnFiltrar.Click += BtnFiltrar_Click;
+
             lstLotes = new ListBox();
-            lstLotes.Location = new Point(10, 25);
+            lstLotes.Location = new Point(10, 75);
             lstLotes.Size = new Size(330, 200);
             lstLotes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lstLotes.SelectedIndexChanged += LstLotes_SelectedIndexChanged;
@@ -85,19 +116,20 @@ namespace ExemploAssinadorXML.Forms
 
             btnAtualizarLotes = new Button();
             btnAtualizarLotes.Text = "Atualizar Lista";
-            btnAtualizarLotes.Location = new Point(10, 235);
+            btnAtualizarLotes.Location = new Point(10, 285);
             btnAtualizarLotes.Size = new Size(150, 30);
             btnAtualizarLotes.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             btnAtualizarLotes.Click += BtnAtualizarLotes_Click;
 
             btnGerarFechamento = new Button();
             btnGerarFechamento.Text = "Gerar Fechamento";
-            btnGerarFechamento.Location = new Point(170, 235);
+            btnGerarFechamento.Location = new Point(170, 285);
             btnGerarFechamento.Size = new Size(170, 30);
             btnGerarFechamento.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             btnGerarFechamento.Click += BtnGerarFechamento_Click;
 
             grpLotes.Controls.AddRange(new Control[] {
+                chkUsarFiltroData, lblFiltroData, dtpFiltroData, btnFiltrar,
                 lstLotes, btnAtualizarLotes, btnGerarFechamento
             });
 
@@ -145,8 +177,22 @@ namespace ExemploAssinadorXML.Forms
 
             try
             {
-                // Tentar extrair protocolo do item selecionado
-                if (lotesCarregados != null && lstLotes.SelectedIndex < lotesCarregados.Count)
+                // Priorizar lotes do banco
+                if (lotesBancoCarregados != null && lstLotes.SelectedIndex < lotesBancoCarregados.Count)
+                {
+                    var lote = lotesBancoCarregados[lstLotes.SelectedIndex];
+                    if (!string.IsNullOrEmpty(lote.ProtocoloEnvio))
+                    {
+                        txtProtocolo.Text = lote.ProtocoloEnvio;
+                        BtnConsultar_Click(null, null);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Este lote não possui protocolo registrado.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+                // Fallback para sistema antigo
+                else if (lotesCarregados != null && lstLotes.SelectedIndex < lotesCarregados.Count)
                 {
                     var lote = lotesCarregados[lstLotes.SelectedIndex];
                     if (!string.IsNullOrEmpty(lote.Protocolo))
@@ -182,6 +228,23 @@ namespace ExemploAssinadorXML.Forms
 
             try
             {
+                // Buscar período do lote no banco de dados
+                string periodoLote = null;
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    var loteBanco = persistenceService.BuscarLotePorProtocolo(txtProtocolo.Text);
+                    if (loteBanco != null && !string.IsNullOrEmpty(loteBanco.Periodo))
+                    {
+                        periodoLote = loteBanco.Periodo;
+                    }
+                }
+                catch (Exception exPeriodo)
+                {
+                    // Não interromper a consulta se houver erro ao buscar período
+                    System.Diagnostics.Debug.WriteLine($"Erro ao buscar período do lote: {exPeriodo.Message}");
+                }
+
                 var consultaService = new EfinanceiraConsultaService();
                 var config = ConfigForm.Config;
                 var cert = BuscarCertificado(config.CertThumbprint);
@@ -195,7 +258,32 @@ namespace ExemploAssinadorXML.Forms
                 rtbResultado.AppendText($"📋 Protocolo: {txtProtocolo.Text}\n");
                 rtbResultado.AppendText($"🌐 Código HTTP: {resposta.CodigoHttp}\n");
                 rtbResultado.AppendText($"📊 Código Resposta: {resposta.CodigoResposta}\n");
-                rtbResultado.AppendText($"📝 Descrição: {resposta.Descricao}\n\n");
+                rtbResultado.AppendText($"📝 Descrição: {resposta.Descricao}\n");
+                
+                // Exibir período do lote
+                if (!string.IsNullOrEmpty(periodoLote))
+                {
+                    // Formatar período de forma mais amigável
+                    string periodoFormatado = periodoLote;
+                    if (periodoLote.Length == 6)
+                    {
+                        int ano = int.Parse(periodoLote.Substring(0, 4));
+                        int mes = int.Parse(periodoLote.Substring(4, 2));
+                        string semestre = "";
+                        if (mes == 1 || mes == 6)
+                        {
+                            semestre = "Jan-Jun";
+                        }
+                        else if (mes == 2 || mes == 12)
+                        {
+                            semestre = "Jul-Dez";
+                        }
+                        periodoFormatado = $"{periodoLote} ({semestre}/{ano})";
+                    }
+                    rtbResultado.AppendText($"📅 Período do Lote: {periodoFormatado}\n");
+                }
+                
+                rtbResultado.AppendText("\n");
 
                 // Informações adicionais do lote
                 if (!string.IsNullOrEmpty(resposta.ProtocoloEnvio))
@@ -348,6 +436,14 @@ namespace ExemploAssinadorXML.Forms
                                 {
                                     rtbResultado.AppendText($"         Tipo: {ocorrencia.Tipo}\n");
                                 }
+                                
+                                // Adicionar orientação de tratamento do erro
+                                string orientacao = ObterOrientacaoTratamentoErro(ocorrencia.Codigo, ocorrencia.Descricao);
+                                if (!string.IsNullOrEmpty(orientacao))
+                                {
+                                    rtbResultado.AppendText($"\n         💡 COMO TRATAR ESTE ERRO:\n");
+                                    rtbResultado.AppendText($"         {orientacao}\n");
+                                }
                             }
                         }
                         else if (!string.IsNullOrEmpty(evento.DescricaoRetorno) && 
@@ -361,8 +457,76 @@ namespace ExemploAssinadorXML.Forms
                     }
                 }
 
-                // Exibir XML completo apenas se solicitado (opcional - pode ser removido ou colocado em botão separado)
-                // Removido para tornar a exibição mais limpa e focada nas informações importantes
+                // Registrar consulta no banco de dados
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    var loteBanco = persistenceService.BuscarLotePorProtocolo(txtProtocolo.Text);
+                    
+                    if (loteBanco != null)
+                    {
+                        // Serializar XML de resposta para JSON (simplificado)
+                        string xmlRespostaJson = JsonSerializer.Serialize(resposta);
+                        
+                        // Atualizar lote com resultado da consulta
+                        persistenceService.AtualizarLote(
+                            loteBanco.IdLote,
+                            resposta.CodigoResposta == 2 ? "CONSULTADO_SUCESSO" : 
+                            resposta.CodigoResposta == 3 ? "CONSULTADO_COM_ERRO" : 
+                            resposta.CodigoResposta == 1 ? "EM_PROCESSAMENTO" : "CONSULTADO",
+                            null,
+                            null,
+                            null,
+                            null,
+                            resposta.CodigoResposta,
+                            resposta.Descricao,
+                            xmlRespostaJson,
+                            null,
+                            resposta.DataProcessamento ?? resposta.DataRecepcao,
+                            null
+                        );
+                        
+                        persistenceService.RegistrarLogLote(loteBanco.IdLote, "CONSULTA", 
+                            $"Consulta realizada. Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                        
+                        // Atualizar status dos eventos
+                        if (resposta.DetalhesEventos != null && resposta.DetalhesEventos.Count > 0)
+                        {
+                            var eventosBanco = persistenceService.BuscarEventosDoLote(loteBanco.IdLote);
+                            
+                            foreach (var eventoConsulta in resposta.DetalhesEventos)
+                            {
+                                // Tentar encontrar evento correspondente pelo ID
+                                var eventoBanco = eventosBanco.FirstOrDefault(evt => 
+                                    !string.IsNullOrEmpty(evt.IdEventoXml) && 
+                                    evt.IdEventoXml.Contains(eventoConsulta.IdEvento ?? ""));
+                                
+                                if (eventoBanco != null)
+                                {
+                                    string statusEvento = eventoConsulta.DescricaoRetorno ?? "CONSULTADO";
+                                    string ocorrenciasJson = null;
+                                    
+                                    if (eventoConsulta.Ocorrencias != null && eventoConsulta.Ocorrencias.Count > 0)
+                                    {
+                                        ocorrenciasJson = JsonSerializer.Serialize(eventoConsulta.Ocorrencias);
+                                    }
+                                    
+                                    persistenceService.AtualizarEvento(
+                                        eventoBanco.IdEvento,
+                                        statusEvento,
+                                        ocorrenciasJson,
+                                        null // numeroRecibo pode ser extraído se disponível
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception exDb)
+                {
+                    // Não interromper o fluxo se houver erro ao registrar no banco
+                    System.Diagnostics.Debug.WriteLine($"Erro ao registrar consulta no banco: {exDb.Message}");
+                }
             }
             catch (Exception ex)
             {
@@ -372,16 +536,71 @@ namespace ExemploAssinadorXML.Forms
             }
         }
 
+        private void BtnFiltrar_Click(object sender, EventArgs e)
+        {
+            BtnAtualizarLotes_Click(sender, e);
+        }
+
         private void BtnAtualizarLotes_Click(object sender, EventArgs e)
         {
             try
             {
                 lstLotes.Items.Clear();
+                lotesCarregados = new List<LoteInfo>();
+                lotesBancoCarregados = new List<LoteBancoInfo>();
                 
-                // Carregar lotes com protocolos registrados
+                // Buscar lotes do banco de dados
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    DateTime? dataInicio = null;
+                    DateTime? dataFim = null;
+                    
+                    if (chkUsarFiltroData.Checked)
+                    {
+                        // Quando filtro está marcado, buscar apenas o dia selecionado
+                        dataInicio = dtpFiltroData.Value.Date;
+                        dataFim = dtpFiltroData.Value.Date.AddDays(1).AddSeconds(-1);
+                    }
+                    // Se filtro não está marcado, passar null para buscar todos os lotes
+                    
+                    lotesBancoCarregados = persistenceService.BuscarLotes(dataInicio, dataFim);
+                    
+                    if (lotesBancoCarregados.Count > 0)
+                    {
+                        foreach (var lote in lotesBancoCarregados.OrderByDescending(l => l.DataCriacao))
+                        {
+                            string tipoStr = lote.TipoLote.ToString();
+                            string protocoloStr = !string.IsNullOrEmpty(lote.ProtocoloEnvio) 
+                                ? $"Protocolo: {lote.ProtocoloEnvio}" 
+                                : "Sem protocolo";
+                            string periodoStr = !string.IsNullOrEmpty(lote.Periodo) 
+                                ? $"Período: {lote.Periodo}" 
+                                : "";
+                            string dataStr = lote.DataCriacao.ToString("dd/MM/yyyy HH:mm:ss");
+                            string retificacaoStr = lote.EhRetificacao ? " [RETIFICAÇÃO]" : "";
+                            
+                            string item = $"[{tipoStr}]{retificacaoStr} {protocoloStr} | {periodoStr} | {dataStr}";
+                            lstLotes.Items.Add(item);
+                        }
+                        MessageBox.Show($"Encontrados {lotesBancoCarregados.Count} lote(s) no banco de dados.", 
+                            "Informação", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        string mensagem = chkUsarFiltroData.Checked 
+                            ? $"Nenhum lote encontrado para a data {dtpFiltroData.Value:dd/MM/yyyy}."
+                            : "Nenhum lote encontrado no banco de dados.";
+                        MessageBox.Show(mensagem, "Informação", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+                catch (Exception exDb)
+                {
+                    MessageBox.Show($"Erro ao buscar lotes do banco: {exDb.Message}\n\nTentando carregar do sistema antigo...", 
+                        "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    
+                    // Fallback: carregar do sistema antigo
                 var lotes = ProtocoloPersistenciaService.CarregarLotes();
-                
-                // Inicializar lista (mesmo se vazia)
                 lotesCarregados = (lotes != null && lotes.Count > 0) 
                     ? lotes.OrderByDescending(l => l.DataProcessamento).ToList()
                     : new List<LoteInfo>();
@@ -401,29 +620,6 @@ namespace ExemploAssinadorXML.Forms
                         
                         string item = $"[{tipoStr}] {protocoloStr} | {periodoStr} | {dataStr}";
                         lstLotes.Items.Add(item);
-                    }
-                }
-                
-                // Também carregar arquivos do diretório (para compatibilidade)
-                if (ConfigForm != null && ConfigForm.Config != null)
-                {
-                    string diretorio = ConfigForm.Config.DiretorioLotes;
-                    if (Directory.Exists(diretorio))
-                    {
-                        var arquivos = Directory.GetFiles(diretorio, "*-Criptografado.xml", SearchOption.AllDirectories);
-                        foreach (var arquivo in arquivos)
-                        {
-                            // Verificar se já está na lista
-                            string nomeArquivo = Path.GetFileName(arquivo);
-                            bool jaExiste = lotes.Any(l => 
-                                !string.IsNullOrEmpty(l.ArquivoCriptografado) && 
-                                Path.GetFileName(l.ArquivoCriptografado) == nomeArquivo);
-                            
-                            if (!jaExiste)
-                            {
-                                var info = new FileInfo(arquivo);
-                                lstLotes.Items.Add($"[Arquivo] {info.Name} - {info.LastWriteTime:dd/MM/yyyy HH:mm:ss}");
-                            }
                         }
                     }
                 }
@@ -440,93 +636,178 @@ namespace ExemploAssinadorXML.Forms
 
             try
             {
-                string itemSelecionado = lstLotes.SelectedItem.ToString();
                 rtbDetalhes.Clear();
                 
-                // Verificar se é um lote registrado (tem protocolo)
-                if (lotesCarregados != null && lstLotes.SelectedIndex < lotesCarregados.Count)
+                // Priorizar lotes do banco
+                if (lotesBancoCarregados != null && lstLotes.SelectedIndex < lotesBancoCarregados.Count)
+                {
+                    var lote = lotesBancoCarregados[lstLotes.SelectedIndex];
+                    
+                    // Tipo do lote - Formatação melhorada
+                    string tipoStr = lote.TipoLote.ToString();
+                    rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n");
+                    rtbDetalhes.AppendText("                    DETALHES DO LOTE\n");
+                    rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n\n");
+                    
+                    rtbDetalhes.AppendText($"📋 Tipo de Lote: {tipoStr}\n");
+                    if (lote.EhRetificacao)
+                    {
+                        rtbDetalhes.AppendText($"⚠️  RETIFICAÇÃO (ID Lote Original: {lote.IdLoteOriginal ?? 0})\n");
+                    }
+                    rtbDetalhes.AppendText("\n");
+                    
+                    // Protocolo - Destacado
+                    string protocoloStr = !string.IsNullOrEmpty(lote.ProtocoloEnvio) ? lote.ProtocoloEnvio : "Não disponível";
+                    rtbDetalhes.AppendText($"📤 Protocolo de Envio: {protocoloStr}\n");
+                    
+                    // Período
+                    string periodoStr = !string.IsNullOrEmpty(lote.Periodo) ? lote.Periodo : "Não informado";
+                    rtbDetalhes.AppendText($"📅 Período: {periodoStr}\n");
+                    rtbDetalhes.AppendText($"📊 Semestre: {lote.Semestre}\n");
+                    rtbDetalhes.AppendText($"🔢 Número do Lote: {lote.NumeroLote}\n");
+                    rtbDetalhes.AppendText($"🏢 CNPJ Declarante: {lote.CnpjDeclarante ?? "N/A"}\n");
+                    rtbDetalhes.AppendText($"🌐 Ambiente: {lote.Ambiente ?? "N/A"}\n\n");
+                    
+                    // Estatísticas de eventos
+                    rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n");
+                    rtbDetalhes.AppendText("              ESTATÍSTICAS DE EVENTOS\n");
+                    rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n\n");
+                    
+                    rtbDetalhes.AppendText($"📦 Quantidade de Eventos: {lote.QuantidadeEventos}\n");
+                    rtbDetalhes.AppendText($"📝 Total Eventos Registrados: {lote.TotalEventosRegistrados}\n");
+                    rtbDetalhes.AppendText($"👤 Eventos com CPF: {lote.TotalEventosComCpf}\n");
+                    rtbDetalhes.AppendText($"✅ Eventos com Sucesso: {lote.TotalEventosSucesso}\n");
+                    rtbDetalhes.AppendText($"❌ Eventos com Erro: {lote.TotalEventosComErro}\n\n");
+                    
+                    // Status
+                    rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n");
+                    rtbDetalhes.AppendText("                         STATUS\n");
+                    rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n\n");
+                    
+                    rtbDetalhes.AppendText($"📊 Status Atual: {lote.Status ?? "N/A"}\n\n");
+                    
+                    // Datas
+                    rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n");
+                    rtbDetalhes.AppendText("                         DATAS\n");
+                    rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n\n");
+                    
+                    rtbDetalhes.AppendText($"📅 Data Criação: {lote.DataCriacao:dd/MM/yyyy HH:mm:ss}\n");
+                    if (lote.DataEnvio.HasValue)
+                    {
+                        rtbDetalhes.AppendText($"📤 Data Envio: {lote.DataEnvio.Value:dd/MM/yyyy HH:mm:ss}\n");
+                    }
+                    if (lote.DataConfirmacao.HasValue)
+                    {
+                        rtbDetalhes.AppendText($"✅ Data Confirmação: {lote.DataConfirmacao.Value:dd/MM/yyyy HH:mm:ss}\n");
+                    }
+                    
+                    // Respostas
+                    if (lote.CodigoRespostaEnvio.HasValue || lote.CodigoRespostaConsulta.HasValue)
+                    {
+                        rtbDetalhes.AppendText("\n");
+                        rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n");
+                        rtbDetalhes.AppendText("                    RESPOSTAS DO SERVIDOR\n");
+                        rtbDetalhes.AppendText("═══════════════════════════════════════════════════════════\n\n");
+                    }
+                    
+                    if (lote.CodigoRespostaEnvio.HasValue)
+                    {
+                        rtbDetalhes.AppendText($"📤 Resposta do Envio:\n");
+                        rtbDetalhes.AppendText($"   Código: {lote.CodigoRespostaEnvio}\n");
+                        rtbDetalhes.AppendText($"   Descrição: {lote.DescricaoRespostaEnvio ?? "N/A"}\n\n");
+                    }
+                    if (lote.CodigoRespostaConsulta.HasValue)
+                    {
+                        rtbDetalhes.AppendText($"🔍 Resposta da Consulta:\n");
+                        rtbDetalhes.AppendText($"   Código: {lote.CodigoRespostaConsulta}\n");
+                        rtbDetalhes.AppendText($"   Descrição: {lote.DescricaoRespostaConsulta ?? "N/A"}\n\n");
+                    }
+                    
+                    // Buscar eventos do lote
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        var eventos = persistenceService.BuscarEventosDoLote(lote.IdLote);
+                        
+                        if (eventos.Count > 0)
+                        {
+                            rtbDetalhes.AppendText($"\n════════════════════════════════════════\n");
+                            rtbDetalhes.AppendText($"EVENTOS DO LOTE ({eventos.Count}):\n");
+                            rtbDetalhes.AppendText($"════════════════════════════════════════\n");
+                            
+                            int eventosComCpf = 0;
+                            foreach (var evento in eventos.Take(10)) // Limitar a 10 para não ficar muito grande
+                            {
+                                rtbDetalhes.AppendText($"\nEvento ID: {evento.IdEventoXml ?? "N/A"}\n");
+                                if (!string.IsNullOrEmpty(evento.Cpf))
+                                {
+                                    rtbDetalhes.AppendText($"  CPF: {evento.Cpf}\n");
+                                    eventosComCpf++;
+                                }
+                                if (!string.IsNullOrEmpty(evento.Nome))
+                                {
+                                    rtbDetalhes.AppendText($"  Nome: {evento.Nome}\n");
+                                }
+                                rtbDetalhes.AppendText($"  Status: {evento.StatusEvento ?? "N/A"}\n");
+                                if (evento.EhRetificacao)
+                                {
+                                    rtbDetalhes.AppendText($"  ⚠️  RETIFICAÇÃO\n");
+                                }
+                            }
+                            
+                            if (eventos.Count > 10)
+                            {
+                                rtbDetalhes.AppendText($"\n... e mais {eventos.Count - 10} evento(s)\n");
+                            }
+                            
+                            rtbDetalhes.AppendText($"\nTotal de eventos com CPF: {eventosComCpf}\n");
+                        }
+                    }
+                    catch (Exception exEventos)
+                    {
+                        rtbDetalhes.AppendText($"\n⚠️  Erro ao buscar eventos: {exEventos.Message}\n");
+                    }
+                    
+                    // Preencher campo de protocolo automaticamente
+                    if (!string.IsNullOrEmpty(lote.ProtocoloEnvio))
+                    {
+                        txtProtocolo.Text = lote.ProtocoloEnvio;
+                        rtbDetalhes.AppendText($"\n[Protocolo preenchido automaticamente - clique em 'Consultar' para verificar status]\n");
+                }
+                else
+                {
+                        txtProtocolo.Text = "";
+                        rtbDetalhes.AppendText($"\n[Este lote ainda não possui protocolo - não foi enviado ou aguardando resposta]\n");
+                    }
+                }
+                // Fallback para sistema antigo
+                else if (lotesCarregados != null && lstLotes.SelectedIndex < lotesCarregados.Count)
                 {
                     var lote = lotesCarregados[lstLotes.SelectedIndex];
                     
-                    // Tipo do lote
                     string tipoStr = lote.Tipo.ToString();
                     rtbDetalhes.AppendText($"════════════════════════════════════════\n");
                     rtbDetalhes.AppendText($"TIPO DE LOTE: {tipoStr}\n");
                     rtbDetalhes.AppendText($"════════════════════════════════════════\n\n");
                     
-                    // Quantidade de eventos
                     rtbDetalhes.AppendText($"Quantidade de Eventos: {lote.QuantidadeEventos}\n");
                     
-                    // Período
                     string periodoStr = !string.IsNullOrEmpty(lote.Periodo) ? lote.Periodo : "Não informado";
                     rtbDetalhes.AppendText($"Período: {periodoStr}\n");
                     
-                    // Protocolo
                     string protocoloStr = !string.IsNullOrEmpty(lote.Protocolo) ? lote.Protocolo : "Não disponível";
                     rtbDetalhes.AppendText($"Protocolo: {protocoloStr}\n");
                     
-                    // Status
                     rtbDetalhes.AppendText($"Status: {lote.Status}\n");
-                    
-                    // Data Processamento
                     rtbDetalhes.AppendText($"Data Processamento: {lote.DataProcessamento:dd/MM/yyyy HH:mm:ss}\n\n");
                     
-                    // Arquivos
-                    rtbDetalhes.AppendText($"════════════════════════════════════════\n");
-                    rtbDetalhes.AppendText($"ARQUIVOS:\n");
-                    rtbDetalhes.AppendText($"════════════════════════════════════════\n");
-                    
-                    if (!string.IsNullOrEmpty(lote.ArquivoOriginal))
-                    {
-                        rtbDetalhes.AppendText($"Original: {Path.GetFileName(lote.ArquivoOriginal)}\n");
-                    }
-                    if (!string.IsNullOrEmpty(lote.ArquivoAssinado))
-                    {
-                        rtbDetalhes.AppendText($"Assinado: {Path.GetFileName(lote.ArquivoAssinado)}\n");
-                    }
-                    if (!string.IsNullOrEmpty(lote.ArquivoCriptografado))
-                    {
-                        rtbDetalhes.AppendText($"Criptografado: {Path.GetFileName(lote.ArquivoCriptografado)}\n");
-                        
-                        // Tentar obter informações do arquivo
-                        if (File.Exists(lote.ArquivoCriptografado))
-                        {
-                            var info = new FileInfo(lote.ArquivoCriptografado);
-                            rtbDetalhes.AppendText($"Tamanho: {info.Length / 1024.0:F2} KB\n");
-                        }
-                    }
-                    
-                    // Preencher campo de protocolo automaticamente
                     if (!string.IsNullOrEmpty(lote.Protocolo))
                     {
                         txtProtocolo.Text = lote.Protocolo;
-                        rtbDetalhes.AppendText($"\n[Protocolo preenchido automaticamente - clique em 'Consultar' para verificar status]\n");
                     }
                     else
                     {
                         txtProtocolo.Text = "";
-                        rtbDetalhes.AppendText($"\n[Este lote ainda não possui protocolo - não foi enviado ou aguardando resposta]\n");
-                    }
-                }
-                else
-                {
-                    // É um arquivo do diretório (sem registro)
-                    if (ConfigForm != null && ConfigForm.Config != null)
-                    {
-                        string diretorio = ConfigForm.Config.DiretorioLotes;
-                        string nomeArquivo = itemSelecionado.Contains("-Criptografado.xml") 
-                            ? itemSelecionado.Substring(itemSelecionado.IndexOf("]") + 2).Split('-')[0] + "-Criptografado.xml"
-                            : itemSelecionado.Split('-')[0] + "-Criptografado.xml";
-                        string caminhoCompleto = Path.Combine(diretorio, nomeArquivo);
-
-                        if (File.Exists(caminhoCompleto))
-                        {
-                            var info = new FileInfo(caminhoCompleto);
-                            rtbDetalhes.AppendText($"Arquivo: {info.Name}\n");
-                            rtbDetalhes.AppendText($"Tamanho: {info.Length / 1024.0:F2} KB\n");
-                            rtbDetalhes.AppendText($"Data: {info.LastWriteTime:dd/MM/yyyy HH:mm:ss}\n");
-                            rtbDetalhes.AppendText($"\n[Este arquivo não possui protocolo registrado]\n");
-                        }
                     }
                 }
             }
@@ -547,6 +828,97 @@ namespace ExemploAssinadorXML.Forms
 
             var form = new GerarFechamentoForm(ConfigForm);
             form.ShowDialog();
+        }
+
+        /// <summary>
+        /// Obtém orientações sobre como tratar erros específicos da e-Financeira
+        /// </summary>
+        private string ObterOrientacaoTratamentoErro(string codigoErro, string descricaoErro)
+        {
+            if (string.IsNullOrWhiteSpace(codigoErro) && string.IsNullOrWhiteSpace(descricaoErro))
+                return null;
+
+            string codigo = codigoErro?.ToUpper().Trim() ?? "";
+            string descricao = descricaoErro?.ToUpper() ?? "";
+
+            // Erros comuns e suas orientações
+            if (codigo.Contains("MS1034") || descricao.Contains("JÁ EXISTE E-FINANCEIRA"))
+            {
+                return "Este erro indica que já existe uma e-Financeira aberta para este período. " +
+                       "SOLUÇÃO: Verifique se já foi enviada uma abertura para este período. " +
+                       "Se sim, você deve enviar movimentações ou fechamento. " +
+                       "Se não, verifique se o período está correto e se há conflito com outro lote.";
+            }
+
+            if (codigo.Contains("MS1047") || descricao.Contains("NÃO EXISTE E-FINANCEIRA ABERTA"))
+            {
+                return "Este erro indica que não existe e-Financeira aberta para o período informado. " +
+                       "SOLUÇÃO: Você deve enviar primeiro um lote de ABERTURA para este período antes de enviar movimentações. " +
+                       "Verifique se a abertura foi enviada e aceita pela Receita Federal.";
+            }
+
+            if (codigo.Contains("MS1001") || descricao.Contains("CNPJ"))
+            {
+                return "Erro relacionado ao CNPJ do declarante. " +
+                       "SOLUÇÃO: Verifique se o CNPJ está correto na configuração e se corresponde ao certificado digital utilizado.";
+            }
+
+            if (codigo.Contains("MS1002") || descricao.Contains("CPF"))
+            {
+                return "Erro relacionado ao CPF do declarado. " +
+                       "SOLUÇÃO: Verifique se o CPF está correto, sem pontos ou hífens, e se possui 11 dígitos. " +
+                       "Corrija o CPF no banco de dados e reenvie o lote.";
+            }
+
+            if (codigo.Contains("MS1003") || descricao.Contains("PERÍODO"))
+            {
+                return "Erro relacionado ao período informado. " +
+                       "SOLUÇÃO: Verifique se o período está no formato correto (YYYYMM, ex: 202301). " +
+                       "O período deve corresponder a um semestre válido (01-06 ou 07-12).";
+            }
+
+            if (codigo.Contains("MS1004") || descricao.Contains("ASSINATURA"))
+            {
+                return "Erro na assinatura digital do XML. " +
+                       "SOLUÇÃO: Verifique se o certificado digital está válido e tem permissão de assinatura. " +
+                       "Regenere o XML e assine novamente com um certificado válido.";
+            }
+
+            if (codigo.Contains("MS1005") || descricao.Contains("CRIPTOGRAFIA"))
+            {
+                return "Erro na criptografia do XML. " +
+                       "SOLUÇÃO: Verifique se o certificado do servidor está correto e válido. " +
+                       "Regenere o XML e criptografe novamente.";
+            }
+
+            if (codigo.Contains("MS1006") || descricao.Contains("VALIDAÇÃO"))
+            {
+                return "Erro de validação do XML. " +
+                       "SOLUÇÃO: Verifique se todos os campos obrigatórios estão preenchidos corretamente. " +
+                       "Consulte o manual da e-Financeira para verificar as regras de validação.";
+            }
+
+            if (descricao.Contains("RETIFICAÇÃO") || descricao.Contains("RETIFIC"))
+            {
+                return "Erro relacionado a retificação. " +
+                       "SOLUÇÃO: Se este é um lote de retificação, verifique se o número do recibo do lote original está correto. " +
+                       "Certifique-se de que o lote original foi processado com sucesso antes de enviar a retificação.";
+            }
+
+            if (descricao.Contains("DUPLICADO") || descricao.Contains("JÁ EXISTE"))
+            {
+                return "O evento ou lote já foi enviado anteriormente. " +
+                       "SOLUÇÃO: Verifique se este lote já foi processado. Se sim, não é necessário reenviar. " +
+                       "Se precisar corrigir, envie uma retificação do lote original.";
+            }
+
+            // Orientação genérica para outros erros
+            return "Para tratar este erro: " +
+                   "1. Verifique a descrição do erro acima para entender o problema específico. " +
+                   "2. Corrija os dados no banco de dados ou na configuração conforme necessário. " +
+                   "3. Regenere o XML com os dados corrigidos. " +
+                   "4. Se for um erro de retificação, verifique se o lote original foi aceito. " +
+                   "5. Consulte o manual da e-Financeira para mais detalhes sobre este código de erro.";
         }
 
         private string ObterDescricaoTipoEvento(string tipoEvento)

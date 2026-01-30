@@ -3,8 +3,12 @@
   "WorkspaceRootPath": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{7A33C55A-B203-4891-A0B0-78964A4F0228}|ExemploAssinadorXML.csproj|c:\\projetos-bscash-nickolas-madeiro\\assinadorefinanceira\\services\\efinanceiradatabaseservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{7A33C55A-B203-4891-A0B0-78964A4F0228}|ExemploAssinadorXML.csproj|solutionrelative:services\\efinanceiradatabaseservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{7A33C55A-B203-4891-A0B0-78964A4F0228}|ExemploAssinadorXML.csproj|c:\\projetos-bscash-nickolas-madeiro\\assinadorefinanceira\\forms\\consultaform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7A33C55A-B203-4891-A0B0-78964A4F0228}|ExemploAssinadorXML.csproj|solutionrelative:forms\\consultaform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7A33C55A-B203-4891-A0B0-78964A4F0228}|ExemploAssinadorXML.csproj|c:\\projetos-bscash-nickolas-madeiro\\assinadorefinanceira\\forms\\processamentoform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7A33C55A-B203-4891-A0B0-78964A4F0228}|ExemploAssinadorXML.csproj|solutionrelative:forms\\processamentoform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{7A33C55A-B203-4891-A0B0-78964A4F0228}|ExemploAssinadorXML.csproj|C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\services\\efinanceiraassinaturaservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -18,30 +22,43 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "EfinanceiraDatabaseService.cs",
-              "DocumentMoniker": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Services\\EfinanceiraDatabaseService.cs",
-              "RelativeDocumentMoniker": "Services\\EfinanceiraDatabaseService.cs",
-              "ToolTip": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Services\\EfinanceiraDatabaseService.cs",
-              "RelativeToolTip": "Services\\EfinanceiraDatabaseService.cs",
-              "ViewState": "AgIAABIAAAAAAAAAAAAmwB0AAAATAAAAAAAAAA==",
+              "DocumentIndex": 1,
+              "Title": "ProcessamentoForm.cs",
+              "DocumentMoniker": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Forms\\ProcessamentoForm.cs",
+              "RelativeDocumentMoniker": "Forms\\ProcessamentoForm.cs",
+              "ToolTip": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Forms\\ProcessamentoForm.cs",
+              "RelativeToolTip": "Forms\\ProcessamentoForm.cs",
+              "ViewState": "AgIAAE0GAAAAAAAAAAASwFcGAABAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-01-30T00:58:49.941Z",
+              "WhenOpened": "2026-01-30T13:35:33.218Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
+              "Title": "ConsultaForm.cs",
+              "DocumentMoniker": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Forms\\ConsultaForm.cs",
+              "RelativeDocumentMoniker": "Forms\\ConsultaForm.cs",
+              "ToolTip": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Forms\\ConsultaForm.cs",
+              "RelativeToolTip": "Forms\\ConsultaForm.cs",
+              "ViewState": "AgIAAJICAAAAAAAAAAAYwEMEAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-30T13:33:29.887Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "EfinanceiraAssinaturaService.cs",
               "DocumentMoniker": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Services\\EfinanceiraAssinaturaService.cs",
               "RelativeDocumentMoniker": "Services\\EfinanceiraAssinaturaService.cs",
               "ToolTip": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Services\\EfinanceiraAssinaturaService.cs",
               "RelativeToolTip": "Services\\EfinanceiraAssinaturaService.cs",
-              "ViewState": "AgIAAMkAAAAAAAAAAAAgwNIAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAM8AAAAAAAAAAAAYwNIAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-01-30T00:21:15.93Z"
             }

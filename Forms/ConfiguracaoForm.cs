@@ -107,9 +107,9 @@ namespace ExemploAssinadorXML.Forms
         private TextBox txtNrReciboFechamento;
         private ComboBox cmbSitEspecial;
         private CheckBox chkNadaADeclarar;
-        private NumericUpDown numFechamentoPP;
-        private NumericUpDown numFechamentoMovOpFin;
-        private NumericUpDown numFechamentoMovOpFinAnual;
+        private CheckBox chkFechamentoPP;
+        private CheckBox chkFechamentoMovOpFin;
+        private CheckBox chkFechamentoMovOpFinAnual;
 
         private Button btnSalvarConfig;
         private ConfiguracaoPersistenciaService persistenciaService;
@@ -157,6 +157,8 @@ namespace ExemploAssinadorXML.Forms
             lblCnpjDeclarante = new Label { Text = "CNPJ Declarante:", Location = new Point(10, yPos), Size = new Size(labelWidth, 20) };
             txtCnpjDeclarante = new TextBox { Location = new Point(campoX, yPos - 3), Size = new Size(200, 23) };
             txtCnpjDeclarante.Leave += ValidarCNPJ;
+            toolTip.SetToolTip(lblCnpjDeclarante, "CNPJ da empresa declarante (sem pontos, barras ou hífens).\nExemplo: 12345678000190");
+            toolTip.SetToolTip(txtCnpjDeclarante, "CNPJ da empresa declarante (sem pontos, barras ou hífens).\nExemplo: 12345678000190");
             yPos += espacamentoVertical;
 
             // Linha 2: Certificado para Assinatura
@@ -164,6 +166,9 @@ namespace ExemploAssinadorXML.Forms
             txtCertThumbprint = new TextBox { Location = new Point(campoX, yPos - 3), Size = new Size(campoWidth, 23), ReadOnly = true };
             btnSelecionarCert = new Button { Text = "Selecionar...", Location = new Point(campoX + campoWidth + 10, yPos - 3), Size = new Size(100, 25) };
             btnSelecionarCert.Click += BtnSelecionarCert_Click;
+            toolTip.SetToolTip(lblCertThumbprint, "Certificado digital A1 (instalado no Windows) usado para assinar os XMLs.\nClique em 'Selecionar...' para escolher o certificado.");
+            toolTip.SetToolTip(txtCertThumbprint, "Certificado digital A1 (instalado no Windows) usado para assinar os XMLs.\nClique em 'Selecionar...' para escolher o certificado.");
+            toolTip.SetToolTip(btnSelecionarCert, "Abre a lista de certificados instalados no Windows para seleção.");
             yPos += espacamentoVertical;
 
             // Linha 3: Certificado do Servidor
@@ -171,12 +176,17 @@ namespace ExemploAssinadorXML.Forms
             txtCertServidorThumbprint = new TextBox { Location = new Point(campoX, yPos - 3), Size = new Size(campoWidth, 23), ReadOnly = true };
             btnSelecionarCertServidor = new Button { Text = "Selecionar...", Location = new Point(campoX + campoWidth + 10, yPos - 3), Size = new Size(100, 25) };
             btnSelecionarCertServidor.Click += BtnSelecionarCertServidor_Click;
+            toolTip.SetToolTip(lblCertServidorThumbprint, "Certificado público do servidor da e-Financeira usado para criptografar os XMLs.\nEste certificado é fornecido pela Receita Federal.");
+            toolTip.SetToolTip(txtCertServidorThumbprint, "Certificado público do servidor da e-Financeira usado para criptografar os XMLs.\nEste certificado é fornecido pela Receita Federal.");
+            toolTip.SetToolTip(btnSelecionarCertServidor, "Abre a lista de certificados para selecionar o certificado público do servidor.");
             yPos += espacamentoVertical;
 
             // Linha 4: Período
             lblPeriodo = new Label { Text = "Período (YYYYMM - 01/06=Jan-Jun, 02/12=Jul-Dez):", Location = new Point(10, yPos), Size = new Size(labelWidth, 20) };
             txtPeriodo = new TextBox { Location = new Point(campoX, yPos - 3), Size = new Size(200, 23) };
             txtPeriodo.MaxLength = 6;
+            toolTip.SetToolTip(lblPeriodo, "Período semestral no formato YYYYMM:\n• 01 ou 06 = Primeiro semestre (Janeiro a Junho)\n• 02 ou 12 = Segundo semestre (Julho a Dezembro)\nExemplos: 202301 (Jan-Jun/2023) ou 202302 (Jul-Dez/2023)");
+            toolTip.SetToolTip(txtPeriodo, "Período semestral no formato YYYYMM:\n• 01 ou 06 = Primeiro semestre (Janeiro a Junho)\n• 02 ou 12 = Segundo semestre (Julho a Dezembro)\nExemplos: 202301 (Jan-Jun/2023) ou 202302 (Jul-Dez/2023)");
             txtPeriodo.Leave += (s, e) => 
             {
                 if (!string.IsNullOrWhiteSpace(txtPeriodo.Text) && txtPeriodo.Text.Length == 6)
@@ -231,6 +241,9 @@ namespace ExemploAssinadorXML.Forms
             txtDiretorioLotes = new TextBox { Location = new Point(campoX, yPos - 3), Size = new Size(campoWidth, 23) };
             btnSelecionarDiretorio = new Button { Text = "...", Location = new Point(campoX + campoWidth + 10, yPos - 3), Size = new Size(30, 25) };
             btnSelecionarDiretorio.Click += BtnSelecionarDiretorio_Click;
+            toolTip.SetToolTip(lblDiretorioLotes, "Diretório onde os arquivos XML serão salvos.\nOs arquivos gerados (original, assinado e criptografado) serão salvos neste diretório.");
+            toolTip.SetToolTip(txtDiretorioLotes, "Diretório onde os arquivos XML serão salvos.\nOs arquivos gerados (original, assinado e criptografado) serão salvos neste diretório.");
+            toolTip.SetToolTip(btnSelecionarDiretorio, "Abre o diálogo para selecionar o diretório onde os lotes serão salvos.");
             yPos += espacamentoVertical;
 
             // Linha 6: Ambiente e Opções
@@ -238,9 +251,14 @@ namespace ExemploAssinadorXML.Forms
             cmbAmbiente = new ComboBox { Location = new Point(campoX, yPos - 3), Size = new Size(100, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbAmbiente.Items.AddRange(new[] { "TEST", "PROD" });
             cmbAmbiente.SelectedIndex = 0;
+            toolTip.SetToolTip(lblAmbiente, "Ambiente de trabalho:\n• TEST = Ambiente de testes/homologação\n• PROD = Ambiente de produção");
+            toolTip.SetToolTip(cmbAmbiente, "Ambiente de trabalho:\n• TEST = Ambiente de testes/homologação\n• PROD = Ambiente de produção");
 
             chkModoTeste = new CheckBox { Text = "Modo Teste", Location = new Point(campoX + 120, yPos), Size = new Size(120, 20), Checked = true };
+            toolTip.SetToolTip(chkModoTeste, "Quando marcado, usa valores menores para processamento (menos registros por página, menos eventos por lote).\nÚtil para testes rápidos sem processar muitos dados.");
+            
             chkHabilitarEnvio = new CheckBox { Text = "Habilitar Envio", Location = new Point(campoX + 250, yPos), Size = new Size(150, 20) };
+            toolTip.SetToolTip(chkHabilitarEnvio, "Quando marcado, permite o envio automático dos lotes para a e-Financeira após processamento.\nSe desmarcado, apenas processa e salva os arquivos localmente.");
             yPos += espacamentoVertical;
 
             // Linha 7: Botões
@@ -424,31 +442,44 @@ namespace ExemploAssinadorXML.Forms
             var lblDtInicio = new Label { Text = "Data Início (AAAA-MM-DD):", Location = new Point(10, 25), Size = new Size(150, 20) };
             txtDtInicioAbertura = new TextBox { Location = new Point(165, 22), Size = new Size(150, 23) };
             txtDtInicioAbertura.Leave += ValidarData;
+            toolTip.SetToolTip(lblDtInicio, "Data de início do período de abertura no formato AAAA-MM-DD.\nExemplo: 2023-01-01");
+            toolTip.SetToolTip(txtDtInicioAbertura, "Data de início do período de abertura no formato AAAA-MM-DD.\nExemplo: 2023-01-01");
 
             var lblDtFim = new Label { Text = "Data Fim (AAAA-MM-DD):", Location = new Point(330, 25), Size = new Size(150, 20) };
             txtDtFimAbertura = new TextBox { Location = new Point(485, 22), Size = new Size(150, 23) };
             txtDtFimAbertura.Leave += ValidarData;
+            toolTip.SetToolTip(lblDtFim, "Data de fim do período de abertura no formato AAAA-MM-DD.\nExemplo: 2023-06-30");
+            toolTip.SetToolTip(txtDtFimAbertura, "Data de fim do período de abertura no formato AAAA-MM-DD.\nExemplo: 2023-06-30");
 
             var lblTipoAmbiente = new Label { Text = "Tipo Ambiente:", Location = new Point(10, 55), Size = new Size(100, 20) };
             cmbTipoAmbienteAbertura = new ComboBox { Location = new Point(115, 52), Size = new Size(150, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbTipoAmbienteAbertura.Items.AddRange(new[] { "1 - Produção", "2 - Homologação" });
             cmbTipoAmbienteAbertura.SelectedIndex = 1;
+            toolTip.SetToolTip(lblTipoAmbiente, "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes");
+            toolTip.SetToolTip(cmbTipoAmbienteAbertura, "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes");
 
             var lblAplicacaoEmissora = new Label { Text = "Aplicação Emissora:", Location = new Point(280, 55), Size = new Size(120, 20) };
             cmbAplicacaoEmissoraAbertura = new ComboBox { Location = new Point(405, 52), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbAplicacaoEmissoraAbertura.Items.AddRange(new[] { "1 - Aplicação do contribuinte", "2 - Outros" });
             cmbAplicacaoEmissoraAbertura.SelectedIndex = 0;
+            toolTip.SetToolTip(lblAplicacaoEmissora, "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações");
+            toolTip.SetToolTip(cmbAplicacaoEmissoraAbertura, "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações");
 
             var lblIndRetificacao = new Label { Text = "Ind Retificação:", Location = new Point(10, 85), Size = new Size(100, 20) };
             cmbIndRetificacaoAbertura = new ComboBox { Location = new Point(115, 82), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbIndRetificacaoAbertura.Items.AddRange(new[] { "1 - Original", "2 - Retificação espontânea", "3 - Retificação a pedido" });
             cmbIndRetificacaoAbertura.SelectedIndex = 0;
             cmbIndRetificacaoAbertura.SelectedIndexChanged += CmbIndRetificacaoAbertura_SelectedIndexChanged;
+            toolTip.SetToolTip(lblIndRetificacao, "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.");
+            toolTip.SetToolTip(cmbIndRetificacaoAbertura, "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.");
 
             var lblNrRecibo = new Label { Text = "Nº Recibo:", Location = new Point(330, 85), Size = new Size(80, 20) };
             txtNrReciboAbertura = new TextBox { Location = new Point(415, 82), Size = new Size(150, 23), Enabled = false };
+            toolTip.SetToolTip(lblNrRecibo, "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.");
+            toolTip.SetToolTip(txtNrReciboAbertura, "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.");
 
             chkIndicarMovOpFin = new CheckBox { Text = "Indicar MovOpFin", Location = new Point(580, 25), Size = new Size(150, 20) };
+            toolTip.SetToolTip(chkIndicarMovOpFin, "Marque esta opção se a empresa possui movimentações de operações financeiras a declarar.\nSe marcado, indica que haverá eventos de movimentação financeira.");
 
             grpBasicos.Controls.AddRange(new Control[] {
                 lblDtInicio, txtDtInicioAbertura, lblDtFim, txtDtFimAbertura,
@@ -487,51 +518,79 @@ namespace ExemploAssinadorXML.Forms
             var lblCNPJ = new Label { Text = "CNPJ:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRMF_CNPJ = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(150, 23) };
             txtRMF_CNPJ.Leave += ValidarCNPJ;
+            toolTip.SetToolTip(lblCNPJ, "CNPJ do responsável RMF (sem pontos, barras ou hífens).\nObrigatório se for pessoa jurídica.");
+            toolTip.SetToolTip(txtRMF_CNPJ, "CNPJ do responsável RMF (sem pontos, barras ou hífens).\nObrigatório se for pessoa jurídica.");
 
             var lblCPF = new Label { Text = "CPF:", Location = new Point(x + 250, y), Size = new Size(80, 20) };
             txtRMF_CPF = new TextBox { Location = new Point(x + 335, y - 3), Size = new Size(150, 23) };
             txtRMF_CPF.Leave += ValidarCPF;
+            toolTip.SetToolTip(lblCPF, "CPF do responsável RMF (sem pontos ou hífens).\nObrigatório se for pessoa física.");
+            toolTip.SetToolTip(txtRMF_CPF, "CPF do responsável RMF (sem pontos ou hífens).\nObrigatório se for pessoa física.");
 
             var lblNome = new Label { Text = "Nome:", Location = new Point(x + 500, y), Size = new Size(80, 20) };
             txtRMF_Nome = new TextBox { Location = new Point(x + 585, y - 3), Size = new Size(300, 23) };
+            toolTip.SetToolTip(lblNome, "Nome completo do responsável RMF.");
+            toolTip.SetToolTip(txtRMF_Nome, "Nome completo do responsável RMF.");
 
             y += 35;
             var lblSetor = new Label { Text = "Setor:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRMF_Setor = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblSetor, "Setor/departamento do responsável RMF na empresa.");
+            toolTip.SetToolTip(txtRMF_Setor, "Setor/departamento do responsável RMF na empresa.");
 
             var lblDDD = new Label { Text = "DDD:", Location = new Point(x + 300, y), Size = new Size(50, 20) };
             txtRMF_DDD = new TextBox { Location = new Point(x + 355, y - 3), Size = new Size(50, 23) };
+            toolTip.SetToolTip(lblDDD, "DDD do telefone do responsável RMF (apenas números).\nExemplo: 11");
+            toolTip.SetToolTip(txtRMF_DDD, "DDD do telefone do responsável RMF (apenas números).\nExemplo: 11");
 
             var lblTelefone = new Label { Text = "Telefone:", Location = new Point(x + 420, y), Size = new Size(70, 20) };
             txtRMF_Telefone = new TextBox { Location = new Point(x + 495, y - 3), Size = new Size(100, 23) };
+            toolTip.SetToolTip(lblTelefone, "Número do telefone do responsável RMF (apenas números).\nExemplo: 987654321");
+            toolTip.SetToolTip(txtRMF_Telefone, "Número do telefone do responsável RMF (apenas números).\nExemplo: 987654321");
 
             var lblRamal = new Label { Text = "Ramal:", Location = new Point(x + 610, y), Size = new Size(60, 20) };
             txtRMF_Ramal = new TextBox { Location = new Point(x + 675, y - 3), Size = new Size(80, 23) };
+            toolTip.SetToolTip(lblRamal, "Ramal do telefone do responsável RMF (opcional).");
+            toolTip.SetToolTip(txtRMF_Ramal, "Ramal do telefone do responsável RMF (opcional).");
 
             y += 35;
             var lblLogradouro = new Label { Text = "Logradouro:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRMF_Logradouro = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(300, 23) };
+            toolTip.SetToolTip(lblLogradouro, "Nome da rua, avenida ou logradouro do endereço do responsável RMF.");
+            toolTip.SetToolTip(txtRMF_Logradouro, "Nome da rua, avenida ou logradouro do endereço do responsável RMF.");
 
             var lblNumero = new Label { Text = "Número:", Location = new Point(x + 400, y), Size = new Size(60, 20) };
             txtRMF_Numero = new TextBox { Location = new Point(x + 465, y - 3), Size = new Size(80, 23) };
+            toolTip.SetToolTip(lblNumero, "Número do endereço do responsável RMF.");
+            toolTip.SetToolTip(txtRMF_Numero, "Número do endereço do responsável RMF.");
 
             var lblComplemento = new Label { Text = "Complemento:", Location = new Point(x + 560, y), Size = new Size(90, 20) };
             txtRMF_Complemento = new TextBox { Location = new Point(x + 655, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblComplemento, "Complemento do endereço (apto, sala, bloco, etc.) - opcional.");
+            toolTip.SetToolTip(txtRMF_Complemento, "Complemento do endereço (apto, sala, bloco, etc.) - opcional.");
 
             y += 35;
             var lblBairro = new Label { Text = "Bairro:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRMF_Bairro = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblBairro, "Bairro do endereço do responsável RMF.");
+            toolTip.SetToolTip(txtRMF_Bairro, "Bairro do endereço do responsável RMF.");
 
             var lblCEP = new Label { Text = "CEP:", Location = new Point(x + 300, y), Size = new Size(50, 20) };
             txtRMF_CEP = new TextBox { Location = new Point(x + 355, y - 3), Size = new Size(100, 23) };
             txtRMF_CEP.Leave += ValidarCEP;
+            toolTip.SetToolTip(lblCEP, "CEP do endereço do responsável RMF (com ou sem hífen).\nExemplo: 01310-100 ou 01310100");
+            toolTip.SetToolTip(txtRMF_CEP, "CEP do endereço do responsável RMF (com ou sem hífen).\nExemplo: 01310-100 ou 01310100");
 
             var lblMunicipio = new Label { Text = "Município:", Location = new Point(x + 470, y), Size = new Size(70, 20) };
             txtRMF_Municipio = new TextBox { Location = new Point(x + 545, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblMunicipio, "Nome do município do endereço do responsável RMF.");
+            toolTip.SetToolTip(txtRMF_Municipio, "Nome do município do endereço do responsável RMF.");
 
             var lblUF = new Label { Text = "UF:", Location = new Point(x + 760, y), Size = new Size(30, 20) };
             txtRMF_UF = new TextBox { Location = new Point(x + 795, y - 3), Size = new Size(50, 23), MaxLength = 2 };
             txtRMF_UF.CharacterCasing = CharacterCasing.Upper;
+            toolTip.SetToolTip(lblUF, "Sigla do estado (UF) do endereço do responsável RMF.\nExemplo: SP, RJ, MG");
+            toolTip.SetToolTip(txtRMF_UF, "Sigla do estado (UF) do endereço do responsável RMF.\nExemplo: SP, RJ, MG");
 
             grp.Controls.AddRange(new Control[] {
                 lblCNPJ, txtRMF_CNPJ, lblCPF, txtRMF_CPF, lblNome, txtRMF_Nome,
@@ -549,51 +608,79 @@ namespace ExemploAssinadorXML.Forms
             var lblCPF = new Label { Text = "CPF:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRespeFin_CPF = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(150, 23) };
             txtRespeFin_CPF.Leave += ValidarCPF;
+            toolTip.SetToolTip(lblCPF, "CPF do responsável pela e-Financeira (sem pontos ou hífens).\nObrigatório.");
+            toolTip.SetToolTip(txtRespeFin_CPF, "CPF do responsável pela e-Financeira (sem pontos ou hífens).\nObrigatório.");
 
             var lblNome = new Label { Text = "Nome:", Location = new Point(x + 250, y), Size = new Size(80, 20) };
             txtRespeFin_Nome = new TextBox { Location = new Point(x + 335, y - 3), Size = new Size(300, 23) };
+            toolTip.SetToolTip(lblNome, "Nome completo do responsável pela e-Financeira.\nObrigatório.");
+            toolTip.SetToolTip(txtRespeFin_Nome, "Nome completo do responsável pela e-Financeira.\nObrigatório.");
 
             var lblEmail = new Label { Text = "Email:", Location = new Point(x + 650, y), Size = new Size(60, 20) };
             txtRespeFin_Email = new TextBox { Location = new Point(x + 715, y - 3), Size = new Size(200, 23) };
             txtRespeFin_Email.Leave += ValidarEmail;
+            toolTip.SetToolTip(lblEmail, "Email do responsável pela e-Financeira.\nFormato: nome@dominio.com");
+            toolTip.SetToolTip(txtRespeFin_Email, "Email do responsável pela e-Financeira.\nFormato: nome@dominio.com");
 
             y += 35;
             var lblSetor = new Label { Text = "Setor:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRespeFin_Setor = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblSetor, "Setor/departamento do responsável pela e-Financeira na empresa.");
+            toolTip.SetToolTip(txtRespeFin_Setor, "Setor/departamento do responsável pela e-Financeira na empresa.");
 
             var lblDDD = new Label { Text = "DDD:", Location = new Point(x + 300, y), Size = new Size(50, 20) };
             txtRespeFin_DDD = new TextBox { Location = new Point(x + 355, y - 3), Size = new Size(50, 23) };
+            toolTip.SetToolTip(lblDDD, "DDD do telefone do responsável pela e-Financeira (apenas números).\nExemplo: 11");
+            toolTip.SetToolTip(txtRespeFin_DDD, "DDD do telefone do responsável pela e-Financeira (apenas números).\nExemplo: 11");
 
             var lblTelefone = new Label { Text = "Telefone:", Location = new Point(x + 420, y), Size = new Size(70, 20) };
             txtRespeFin_Telefone = new TextBox { Location = new Point(x + 495, y - 3), Size = new Size(100, 23) };
+            toolTip.SetToolTip(lblTelefone, "Número do telefone do responsável pela e-Financeira (apenas números).\nExemplo: 987654321");
+            toolTip.SetToolTip(txtRespeFin_Telefone, "Número do telefone do responsável pela e-Financeira (apenas números).\nExemplo: 987654321");
 
             var lblRamal = new Label { Text = "Ramal:", Location = new Point(x + 610, y), Size = new Size(60, 20) };
             txtRespeFin_Ramal = new TextBox { Location = new Point(x + 675, y - 3), Size = new Size(80, 23) };
+            toolTip.SetToolTip(lblRamal, "Ramal do telefone do responsável pela e-Financeira (opcional).");
+            toolTip.SetToolTip(txtRespeFin_Ramal, "Ramal do telefone do responsável pela e-Financeira (opcional).");
 
             y += 35;
             var lblLogradouro = new Label { Text = "Logradouro:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRespeFin_Logradouro = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(300, 23) };
+            toolTip.SetToolTip(lblLogradouro, "Nome da rua, avenida ou logradouro do endereço do responsável pela e-Financeira.");
+            toolTip.SetToolTip(txtRespeFin_Logradouro, "Nome da rua, avenida ou logradouro do endereço do responsável pela e-Financeira.");
 
             var lblNumero = new Label { Text = "Número:", Location = new Point(x + 400, y), Size = new Size(60, 20) };
             txtRespeFin_Numero = new TextBox { Location = new Point(x + 465, y - 3), Size = new Size(80, 23) };
+            toolTip.SetToolTip(lblNumero, "Número do endereço do responsável pela e-Financeira.");
+            toolTip.SetToolTip(txtRespeFin_Numero, "Número do endereço do responsável pela e-Financeira.");
 
             var lblComplemento = new Label { Text = "Complemento:", Location = new Point(x + 560, y), Size = new Size(90, 20) };
             txtRespeFin_Complemento = new TextBox { Location = new Point(x + 655, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblComplemento, "Complemento do endereço (apto, sala, bloco, etc.) - opcional.");
+            toolTip.SetToolTip(txtRespeFin_Complemento, "Complemento do endereço (apto, sala, bloco, etc.) - opcional.");
 
             y += 35;
             var lblBairro = new Label { Text = "Bairro:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRespeFin_Bairro = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblBairro, "Bairro do endereço do responsável pela e-Financeira.");
+            toolTip.SetToolTip(txtRespeFin_Bairro, "Bairro do endereço do responsável pela e-Financeira.");
 
             var lblCEP = new Label { Text = "CEP:", Location = new Point(x + 300, y), Size = new Size(50, 20) };
             txtRespeFin_CEP = new TextBox { Location = new Point(x + 355, y - 3), Size = new Size(100, 23) };
             txtRespeFin_CEP.Leave += ValidarCEP;
+            toolTip.SetToolTip(lblCEP, "CEP do endereço do responsável pela e-Financeira (com ou sem hífen).\nExemplo: 01310-100 ou 01310100");
+            toolTip.SetToolTip(txtRespeFin_CEP, "CEP do endereço do responsável pela e-Financeira (com ou sem hífen).\nExemplo: 01310-100 ou 01310100");
 
             var lblMunicipio = new Label { Text = "Município:", Location = new Point(x + 470, y), Size = new Size(70, 20) };
             txtRespeFin_Municipio = new TextBox { Location = new Point(x + 545, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblMunicipio, "Nome do município do endereço do responsável pela e-Financeira.");
+            toolTip.SetToolTip(txtRespeFin_Municipio, "Nome do município do endereço do responsável pela e-Financeira.");
 
             var lblUF = new Label { Text = "UF:", Location = new Point(x + 760, y), Size = new Size(30, 20) };
             txtRespeFin_UF = new TextBox { Location = new Point(x + 795, y - 3), Size = new Size(50, 23), MaxLength = 2 };
             txtRespeFin_UF.CharacterCasing = CharacterCasing.Upper;
+            toolTip.SetToolTip(lblUF, "Sigla do estado (UF) do endereço do responsável pela e-Financeira.\nExemplo: SP, RJ, MG");
+            toolTip.SetToolTip(txtRespeFin_UF, "Sigla do estado (UF) do endereço do responsável pela e-Financeira.\nExemplo: SP, RJ, MG");
 
             grp.Controls.AddRange(new Control[] {
                 lblCPF, txtRespeFin_CPF, lblNome, txtRespeFin_Nome, lblEmail, txtRespeFin_Email,
@@ -611,18 +698,28 @@ namespace ExemploAssinadorXML.Forms
             var lblCPF = new Label { Text = "CPF:", Location = new Point(x, y), Size = new Size(80, 20) };
             txtRepresLegal_CPF = new TextBox { Location = new Point(x + 85, y - 3), Size = new Size(150, 23) };
             txtRepresLegal_CPF.Leave += ValidarCPF;
+            toolTip.SetToolTip(lblCPF, "CPF do representante legal (sem pontos ou hífens).\nObrigatório.");
+            toolTip.SetToolTip(txtRepresLegal_CPF, "CPF do representante legal (sem pontos ou hífens).\nObrigatório.");
 
             var lblSetor = new Label { Text = "Setor:", Location = new Point(x + 250, y), Size = new Size(80, 20) };
             txtRepresLegal_Setor = new TextBox { Location = new Point(x + 335, y - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblSetor, "Setor/departamento do representante legal na empresa.");
+            toolTip.SetToolTip(txtRepresLegal_Setor, "Setor/departamento do representante legal na empresa.");
 
             var lblDDD = new Label { Text = "DDD:", Location = new Point(x + 550, y), Size = new Size(50, 20) };
             txtRepresLegal_DDD = new TextBox { Location = new Point(x + 605, y - 3), Size = new Size(50, 23) };
+            toolTip.SetToolTip(lblDDD, "DDD do telefone do representante legal (apenas números).\nExemplo: 11");
+            toolTip.SetToolTip(txtRepresLegal_DDD, "DDD do telefone do representante legal (apenas números).\nExemplo: 11");
 
             var lblTelefone = new Label { Text = "Telefone:", Location = new Point(x + 670, y), Size = new Size(70, 20) };
             txtRepresLegal_Telefone = new TextBox { Location = new Point(x + 745, y - 3), Size = new Size(100, 23) };
+            toolTip.SetToolTip(lblTelefone, "Número do telefone do representante legal (apenas números).\nExemplo: 987654321");
+            toolTip.SetToolTip(txtRepresLegal_Telefone, "Número do telefone do representante legal (apenas números).\nExemplo: 987654321");
 
             var lblRamal = new Label { Text = "Ramal:", Location = new Point(x + 860, y), Size = new Size(60, 20) };
             txtRepresLegal_Ramal = new TextBox { Location = new Point(x + 925, y - 3), Size = new Size(80, 23) };
+            toolTip.SetToolTip(lblRamal, "Ramal do telefone do representante legal (opcional).");
+            toolTip.SetToolTip(txtRepresLegal_Ramal, "Ramal do telefone do representante legal (opcional).");
 
             grp.Controls.AddRange(new Control[] {
                 lblCPF, txtRepresLegal_CPF, lblSetor, txtRepresLegal_Setor,
@@ -641,73 +738,140 @@ namespace ExemploAssinadorXML.Forms
             var lblDtInicio = new Label { Text = "Data Início (AAAA-MM-DD):", Location = new Point(10, 25), Size = new Size(150, 20) };
             txtDtInicioFechamento = new TextBox { Location = new Point(165, 22), Size = new Size(150, 23) };
             txtDtInicioFechamento.Leave += ValidarData;
+            toolTip.SetToolTip(lblDtInicio, "Data de início do período de fechamento no formato AAAA-MM-DD.\nExemplo: 2023-01-01");
+            toolTip.SetToolTip(txtDtInicioFechamento, "Data de início do período de fechamento no formato AAAA-MM-DD.\nExemplo: 2023-01-01");
 
             var lblDtFim = new Label { Text = "Data Fim (AAAA-MM-DD):", Location = new Point(330, 25), Size = new Size(150, 20) };
             txtDtFimFechamento = new TextBox { Location = new Point(485, 22), Size = new Size(150, 23) };
             txtDtFimFechamento.Leave += ValidarData;
+            toolTip.SetToolTip(lblDtFim, "Data de fim do período de fechamento no formato AAAA-MM-DD.\nExemplo: 2023-06-30");
+            toolTip.SetToolTip(txtDtFimFechamento, "Data de fim do período de fechamento no formato AAAA-MM-DD.\nExemplo: 2023-06-30");
 
             var lblTipoAmbiente = new Label { Text = "Tipo Ambiente:", Location = new Point(10, 55), Size = new Size(100, 20) };
             cmbTipoAmbienteFechamento = new ComboBox { Location = new Point(115, 52), Size = new Size(150, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbTipoAmbienteFechamento.Items.AddRange(new[] { "1 - Produção", "2 - Homologação" });
             cmbTipoAmbienteFechamento.SelectedIndex = 1;
+            toolTip.SetToolTip(lblTipoAmbiente, "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes");
+            toolTip.SetToolTip(cmbTipoAmbienteFechamento, "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes");
 
             var lblAplicacaoEmissora = new Label { Text = "Aplicação Emissora:", Location = new Point(280, 55), Size = new Size(120, 20) };
             cmbAplicacaoEmissoraFechamento = new ComboBox { Location = new Point(405, 52), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbAplicacaoEmissoraFechamento.Items.AddRange(new[] { "1 - Aplicação do contribuinte", "2 - Outros" });
             cmbAplicacaoEmissoraFechamento.SelectedIndex = 0;
+            toolTip.SetToolTip(lblAplicacaoEmissora, "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações");
+            toolTip.SetToolTip(cmbAplicacaoEmissoraFechamento, "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações");
 
             var lblIndRetificacao = new Label { Text = "Ind Retificação:", Location = new Point(10, 85), Size = new Size(100, 20) };
             cmbIndRetificacaoFechamento = new ComboBox { Location = new Point(115, 82), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbIndRetificacaoFechamento.Items.AddRange(new[] { "1 - Original", "2 - Retificação espontânea", "3 - Retificação a pedido" });
             cmbIndRetificacaoFechamento.SelectedIndex = 0;
             cmbIndRetificacaoFechamento.SelectedIndexChanged += CmbIndRetificacaoFechamento_SelectedIndexChanged;
+            toolTip.SetToolTip(lblIndRetificacao, "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.");
+            toolTip.SetToolTip(cmbIndRetificacaoFechamento, "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.");
 
             var lblNrRecibo = new Label { Text = "Nº Recibo:", Location = new Point(330, 85), Size = new Size(80, 20) };
             txtNrReciboFechamento = new TextBox { Location = new Point(415, 82), Size = new Size(150, 23), Enabled = false };
+            toolTip.SetToolTip(lblNrRecibo, "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.");
+            toolTip.SetToolTip(txtNrReciboFechamento, "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.");
 
             var lblSitEspecial = new Label { Text = "Situação Especial:", Location = new Point(10, 115), Size = new Size(120, 20) };
             cmbSitEspecial = new ComboBox { Location = new Point(135, 112), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbSitEspecial.Items.AddRange(new[] { "0 - Não se aplica", "1 - Extinção", "2 - Fusão", "3 - Incorporação", "5 - Cisão" });
             cmbSitEspecial.SelectedIndex = 0;
+            toolTip.SetToolTip(lblSitEspecial, "Situação especial da empresa:\n• 0 - Não se aplica: Situação normal\n• 1 - Extinção: Empresa extinta\n• 2 - Fusão: Empresa fundida\n• 3 - Incorporação: Empresa incorporada\n• 5 - Cisão: Empresa cindida");
+            toolTip.SetToolTip(cmbSitEspecial, "Situação especial da empresa:\n• 0 - Não se aplica: Situação normal\n• 1 - Extinção: Empresa extinta\n• 2 - Fusão: Empresa fundida\n• 3 - Incorporação: Empresa incorporada\n• 5 - Cisão: Empresa cindida");
 
             chkNadaADeclarar = new CheckBox { Text = "Nada a Declarar", Location = new Point(350, 115), Size = new Size(150, 20) };
+            toolTip.SetToolTip(chkNadaADeclarar, "Marque esta opção se não houver nada a declarar no período.\nSe marcado, não é necessário preencher os campos de fechamento.");
 
+            // FechamentoPP - Toggle
             var lblFechamentoPP = new Label { Text = "FechamentoPP:", Location = new Point(10, 145), Size = new Size(120, 20) };
-            numFechamentoPP = new NumericUpDown { Location = new Point(135, 142), Size = new Size(60, 23), Minimum = 0, Maximum = 1, DecimalPlaces = 0 };
-            toolTip.SetToolTip(numFechamentoPP, "0 = Sem movimento de Previdência Privada\n1 = Com movimento de Previdência Privada");
-            toolTip.SetToolTip(lblFechamentoPP, "0 = Sem movimento de Previdência Privada\n1 = Com movimento de Previdência Privada");
+            chkFechamentoPP = new CheckBox 
+            { 
+                Text = "Com movimento de Previdência Privada", 
+                Location = new Point(135, 142), 
+                Size = new Size(250, 23),
+                Appearance = Appearance.Button,
+                FlatStyle = FlatStyle.Flat
+            };
+            chkFechamentoPP.FlatAppearance.BorderSize = 1;
+            chkFechamentoPP.FlatAppearance.BorderColor = Color.Gray;
+            chkFechamentoPP.CheckedChanged += (s, e) => 
+            {
+                chkFechamentoPP.Text = chkFechamentoPP.Checked 
+                    ? "✓ Com movimento de Previdência Privada" 
+                    : "✗ Sem movimento de Previdência Privada";
+                chkFechamentoPP.BackColor = chkFechamentoPP.Checked ? Color.LightGreen : Color.LightGray;
+            };
+            chkFechamentoPP.Checked = false; // Inicializar (dispara o evento CheckedChanged)
+            toolTip.SetToolTip(chkFechamentoPP, "Marque se há movimento de Previdência Privada no período.\nDesmarque se não houver movimento de Previdência Privada.");
+            toolTip.SetToolTip(lblFechamentoPP, "Indica se há movimento de Previdência Privada no período.\nMarque = Com movimento | Desmarque = Sem movimento");
 
-            var lblFechamentoMovOpFin = new Label { Text = "FechamentoMovOpFin:", Location = new Point(210, 145), Size = new Size(150, 20) };
-            numFechamentoMovOpFin = new NumericUpDown { Location = new Point(365, 142), Size = new Size(60, 23), Minimum = 0, Maximum = 1, DecimalPlaces = 0 };
-            toolTip.SetToolTip(numFechamentoMovOpFin, "0 = Sem movimento de Operação Financeira\n1 = Com movimento de Operação Financeira");
-            toolTip.SetToolTip(lblFechamentoMovOpFin, "0 = Sem movimento de Operação Financeira\n1 = Com movimento de Operação Financeira");
+            // FechamentoMovOpFin - Toggle
+            var lblFechamentoMovOpFin = new Label { Text = "FechamentoMovOpFin:", Location = new Point(400, 145), Size = new Size(150, 20) };
+            chkFechamentoMovOpFin = new CheckBox 
+            { 
+                Text = "Com movimento de Operação Financeira", 
+                Location = new Point(555, 142), 
+                Size = new Size(280, 23),
+                Appearance = Appearance.Button,
+                FlatStyle = FlatStyle.Flat
+            };
+            chkFechamentoMovOpFin.FlatAppearance.BorderSize = 1;
+            chkFechamentoMovOpFin.FlatAppearance.BorderColor = Color.Gray;
+            chkFechamentoMovOpFin.CheckedChanged += (s, e) => 
+            {
+                chkFechamentoMovOpFin.Text = chkFechamentoMovOpFin.Checked 
+                    ? "✓ Com movimento de Operação Financeira" 
+                    : "✗ Sem movimento de Operação Financeira";
+                chkFechamentoMovOpFin.BackColor = chkFechamentoMovOpFin.Checked ? Color.LightGreen : Color.LightGray;
+            };
+            chkFechamentoMovOpFin.Checked = false; // Inicializar (dispara o evento CheckedChanged)
+            toolTip.SetToolTip(chkFechamentoMovOpFin, "Marque se há movimento de Operação Financeira no período.\nDesmarque se não houver movimento de Operação Financeira.");
+            toolTip.SetToolTip(lblFechamentoMovOpFin, "Indica se há movimento de Operação Financeira no período.\nMarque = Com movimento | Desmarque = Sem movimento");
 
-            var lblFechamentoMovOpFinAnual = new Label { Text = "FechamentoMovOpFinAnual:", Location = new Point(440, 145), Size = new Size(180, 20) };
-            numFechamentoMovOpFinAnual = new NumericUpDown { Location = new Point(625, 142), Size = new Size(60, 23), Minimum = 0, Maximum = 1, DecimalPlaces = 0 };
-            toolTip.SetToolTip(numFechamentoMovOpFinAnual, "0 = Sem movimento de Operação Financeira Anual\n1 = Com movimento de Operação Financeira Anual");
-            toolTip.SetToolTip(lblFechamentoMovOpFinAnual, "0 = Sem movimento de Operação Financeira Anual\n1 = Com movimento de Operação Financeira Anual");
+            // FechamentoMovOpFinAnual - Toggle
+            var lblFechamentoMovOpFinAnual = new Label { Text = "FechamentoMovOpFinAnual:", Location = new Point(10, 175), Size = new Size(180, 20) };
+            chkFechamentoMovOpFinAnual = new CheckBox 
+            { 
+                Text = "Com movimento de Operação Financeira Anual", 
+                Location = new Point(195, 172), 
+                Size = new Size(320, 23),
+                Appearance = Appearance.Button,
+                FlatStyle = FlatStyle.Flat
+            };
+            chkFechamentoMovOpFinAnual.FlatAppearance.BorderSize = 1;
+            chkFechamentoMovOpFinAnual.FlatAppearance.BorderColor = Color.Gray;
+            chkFechamentoMovOpFinAnual.CheckedChanged += (s, e) => 
+            {
+                chkFechamentoMovOpFinAnual.Text = chkFechamentoMovOpFinAnual.Checked 
+                    ? "✓ Com movimento de Operação Financeira Anual" 
+                    : "✗ Sem movimento de Operação Financeira Anual";
+                chkFechamentoMovOpFinAnual.BackColor = chkFechamentoMovOpFinAnual.Checked ? Color.LightGreen : Color.LightGray;
+            };
+            chkFechamentoMovOpFinAnual.Checked = false; // Inicializar (dispara o evento CheckedChanged)
+            toolTip.SetToolTip(chkFechamentoMovOpFinAnual, "Marque se há movimento de Operação Financeira Anual no período.\nDesmarque se não houver movimento de Operação Financeira Anual.");
+            toolTip.SetToolTip(lblFechamentoMovOpFinAnual, "Indica se há movimento de Operação Financeira Anual no período.\nMarque = Com movimento | Desmarque = Sem movimento");
 
             // Legenda explicativa
             var lblLegenda = new Label 
             { 
-                Text = "ℹ️ IMPORTANTE: Se 'Nada a Declarar' NÃO estiver marcado, você DEVE preencher pelo menos um dos campos de fechamento acima (FechamentoPP, FechamentoMovOpFin ou FechamentoMovOpFinAnual).\n" +
-                       "Valores: 0 = Sem movimento | 1 = Com movimento\n" +
-                       "Exemplo: Se você enviou movimentações financeiras, deve preencher FechamentoMovOpFin com 0 (sem movimento adicional) ou 1 (com movimento adicional).",
-                Location = new Point(10, 175), 
-                Size = new Size(920, 60),
+                Text = "ℹ️ IMPORTANTE: Se 'Nada a Declarar' NÃO estiver marcado, você DEVE marcar pelo menos um dos campos de fechamento acima.\n" +
+                       "Use os toggles acima para indicar se há movimento de Previdência Privada, Operação Financeira ou Operação Financeira Anual.\n" +
+                       "Exemplo: Se você enviou movimentações financeiras, marque 'FechamentoMovOpFin'.",
+                Location = new Point(10, 205), 
+                Size = new Size(920, 50),
                 ForeColor = Color.DarkBlue,
                 Font = new Font("Microsoft Sans Serif", 8.5f, FontStyle.Regular)
             };
-
-            toolTip.SetToolTip(chkNadaADeclarar, "Marque esta opção se não houver nada a declarar no período.\nSe marcado, não é necessário preencher os campos de fechamento.");
 
             grpBasicos.Controls.AddRange(new Control[] {
                 lblDtInicio, txtDtInicioFechamento, lblDtFim, txtDtFimFechamento,
                 lblTipoAmbiente, cmbTipoAmbienteFechamento, lblAplicacaoEmissora, cmbAplicacaoEmissoraFechamento,
                 lblIndRetificacao, cmbIndRetificacaoFechamento, lblNrRecibo, txtNrReciboFechamento,
                 lblSitEspecial, cmbSitEspecial, chkNadaADeclarar,
-                lblFechamentoPP, numFechamentoPP, lblFechamentoMovOpFin, numFechamentoMovOpFin,
-                lblFechamentoMovOpFinAnual, numFechamentoMovOpFinAnual,
+                lblFechamentoPP, chkFechamentoPP, lblFechamentoMovOpFin, chkFechamentoMovOpFin,
+                lblFechamentoMovOpFinAnual, chkFechamentoMovOpFinAnual,
                 lblLegenda
             });
 
@@ -966,9 +1130,9 @@ namespace ExemploAssinadorXML.Forms
                     NrRecibo = txtNrReciboFechamento.Text,
                     SitEspecial = int.Parse(cmbSitEspecial.SelectedItem.ToString().Split('-')[0].Trim()),
                     NadaADeclarar = chkNadaADeclarar.Checked ? "1" : null,
-                    FechamentoPP = numFechamentoPP.Value > 0 ? (int?)numFechamentoPP.Value : null,
-                    FechamentoMovOpFin = numFechamentoMovOpFin.Value > 0 ? (int?)numFechamentoMovOpFin.Value : null,
-                    FechamentoMovOpFinAnual = numFechamentoMovOpFinAnual.Value > 0 ? (int?)numFechamentoMovOpFinAnual.Value : null
+                    FechamentoPP = chkFechamentoPP.Checked ? (int?)1 : null,
+                    FechamentoMovOpFin = chkFechamentoMovOpFin.Checked ? (int?)1 : null,
+                    FechamentoMovOpFinAnual = chkFechamentoMovOpFinAnual.Checked ? (int?)1 : null
                 };
 
                 // Persistir
@@ -1017,22 +1181,22 @@ namespace ExemploAssinadorXML.Forms
             // Validação de fechamento: se não for "nada a declarar", deve ter pelo menos um fechamento
             if (!chkNadaADeclarar.Checked)
             {
-                bool temFechamentoPP = numFechamentoPP.Value > 0;
-                bool temFechamentoMovOpFin = numFechamentoMovOpFin.Value > 0;
-                bool temFechamentoMovOpFinAnual = numFechamentoMovOpFinAnual.Value > 0;
+                bool temFechamentoPP = chkFechamentoPP.Checked;
+                bool temFechamentoMovOpFin = chkFechamentoMovOpFin.Checked;
+                bool temFechamentoMovOpFinAnual = chkFechamentoMovOpFinAnual.Checked;
 
                 if (!temFechamentoPP && !temFechamentoMovOpFin && !temFechamentoMovOpFinAnual)
                 {
                     MessageBox.Show(
                         "Se 'Nada a Declarar' não estiver marcado, você DEVE preencher pelo menos um dos campos de fechamento:\n\n" +
-                        "• FechamentoPP (0 = sem movimento, 1 = com movimento)\n" +
-                        "• FechamentoMovOpFin (0 = sem movimento, 1 = com movimento)\n" +
-                        "• FechamentoMovOpFinAnual (0 = sem movimento, 1 = com movimento)\n\n" +
-                        "Exemplo: Se você enviou movimentações financeiras, deve preencher FechamentoMovOpFin com 0 ou 1.",
+                        "• FechamentoPP (marque se houver movimento de Previdência Privada)\n" +
+                        "• FechamentoMovOpFin (marque se houver movimento de Operação Financeira)\n" +
+                        "• FechamentoMovOpFinAnual (marque se houver movimento de Operação Financeira Anual)\n\n" +
+                        "Exemplo: Se você enviou movimentações financeiras, marque o toggle 'FechamentoMovOpFin'.",
                         "Validação de Fechamento",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
-                    numFechamentoMovOpFin.Focus();
+                    chkFechamentoMovOpFin.Focus();
                     return false;
                 }
             }
@@ -1201,9 +1365,9 @@ namespace ExemploAssinadorXML.Forms
                 txtNrReciboFechamento.Text = dados.NrRecibo ?? "";
                 cmbSitEspecial.SelectedIndex = Array.IndexOf(new[] { 0, 1, 2, 3, 5 }, dados.SitEspecial);
                 chkNadaADeclarar.Checked = dados.NadaADeclarar == "1";
-                numFechamentoPP.Value = dados.FechamentoPP ?? 0;
-                numFechamentoMovOpFin.Value = dados.FechamentoMovOpFin ?? 0;
-                numFechamentoMovOpFinAnual.Value = dados.FechamentoMovOpFinAnual ?? 0;
+                chkFechamentoPP.Checked = dados.FechamentoPP > 0;
+                chkFechamentoMovOpFin.Checked = dados.FechamentoMovOpFin > 0;
+                chkFechamentoMovOpFinAnual.Checked = dados.FechamentoMovOpFinAnual > 0;
             }
         }
 

@@ -603,6 +603,38 @@ namespace ExemploAssinadorXML.Forms
 
                 if (cancelarProcessamento) return;
 
+                // Registrar lote no banco após gerar XML
+                int quantidadeEventos = ProtocoloPersistenciaService.ContarEventosNoXml(arquivoXml);
+                long idLoteBanco = 0;
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : "HOMOLOG";
+                    idLoteBanco = persistenceService.RegistrarLote(
+                        TipoLote.Abertura,
+                        config.Periodo,
+                        quantidadeEventos,
+                        config.CnpjDeclarante,
+                        arquivoXml,
+                        null, // Ainda não assinado
+                        null, // Ainda não criptografado
+                        ambienteStr
+                    );
+                    persistenceService.RegistrarLogLote(idLoteBanco, "GERACAO", $"XML gerado: {Path.GetFileName(arquivoXml)}");
+                    AdicionarLog($"Lote registrado no banco (ID: {idLoteBanco}).");
+                }
+                catch (Exception exDb)
+                {
+                    string erroCompleto = $"⚠ ERRO ao registrar lote no banco: {exDb.Message}";
+                    if (exDb.InnerException != null)
+                    {
+                        erroCompleto += $"\nDetalhes: {exDb.InnerException.Message}";
+                    }
+                    AdicionarLog(erroCompleto);
+                    MessageBox.Show($"Erro ao registrar lote no banco de dados:\n\n{erroCompleto}", 
+                        "Erro de Banco de Dados", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
                 // 2. Assinar
                 AtualizarEtapa("Assinando XML...");
                 var assinaturaService = new EfinanceiraAssinaturaService();
@@ -614,6 +646,21 @@ namespace ExemploAssinadorXML.Forms
                 AtualizarEstatisticas();
                 AdicionarLog($"XML assinado: {arquivoAssinado}");
 
+                // Atualizar lote no banco após assinar
+                if (idLoteBanco > 0)
+                {
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        persistenceService.AtualizarLote(idLoteBanco, "ASSINADO");
+                        persistenceService.RegistrarLogLote(idLoteBanco, "ASSINATURA", $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                    }
+                    catch (Exception exDb)
+                    {
+                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após assinatura: {exDb.Message}");
+                    }
+                }
+
                 if (cancelarProcessamento) return;
 
                 // 3. Criptografar
@@ -624,10 +671,24 @@ namespace ExemploAssinadorXML.Forms
                 AtualizarEstatisticas();
                 AdicionarLog($"XML criptografado: {arquivoCriptografado}");
 
+                // Atualizar lote no banco após criptografar
+                if (idLoteBanco > 0)
+                {
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        persistenceService.AtualizarLote(idLoteBanco, "CRIPTOGRAFADO");
+                        persistenceService.RegistrarLogLote(idLoteBanco, "CRIPTOGRAFIA", $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
+                    }
+                    catch (Exception exDb)
+                    {
+                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após criptografia: {exDb.Message}");
+                    }
+                }
+
                 if (cancelarProcessamento) return;
 
-                // Registrar lote processado (mesmo sem envio)
-                int quantidadeEventos = ProtocoloPersistenciaService.ContarEventosNoXml(arquivoAssinado);
+                // Registrar lote processado (mesmo sem envio) - manter compatibilidade com sistema antigo
                 ProtocoloPersistenciaService.RegistrarProtocolo(
                     TipoLote.Abertura,
                     arquivoCriptografado,
@@ -659,6 +720,7 @@ namespace ExemploAssinadorXML.Forms
                         
                         if (resposta.CodigoResposta == 1)
                         {
+                            // AGUARDAR PROTOCOLO - Não finalizar sem protocolo
                             if (!string.IsNullOrEmpty(resposta.Protocolo))
                             {
                                 // Adicionar protocolo à lista
@@ -673,7 +735,36 @@ namespace ExemploAssinadorXML.Forms
                                 AdicionarLog($"{resposta.Protocolo}");
                                 AdicionarLog($"════════════════════════════════════════");
                                 
-                                // Atualizar protocolo no lote já registrado
+                                // Atualizar lote no banco após envio
+                                if (idLoteBanco > 0)
+                                {
+                                    try
+                                    {
+                                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                        string xmlResposta = resposta.XmlCompleto ?? "";
+                                        persistenceService.AtualizarLote(
+                                            idLoteBanco,
+                                            "ENVIADO",
+                                            resposta.Protocolo,
+                                            resposta.CodigoResposta,
+                                            resposta.Descricao,
+                                            xmlResposta,
+                                            null,
+                                            null,
+                                            null,
+                                            DateTime.Now,
+                                            null,
+                                            null
+                                        );
+                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {resposta.Protocolo}");
+                                    }
+                                    catch (Exception exDb)
+                                    {
+                                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após envio: {exDb.Message}");
+                                    }
+                                }
+                                
+                                // Atualizar protocolo no lote já registrado (sistema antigo)
                                 ProtocoloPersistenciaService.RegistrarProtocolo(
                                     TipoLote.Abertura, 
                                     arquivoCriptografado, 
@@ -708,13 +799,85 @@ namespace ExemploAssinadorXML.Forms
                             }
                             else
                             {
-                                AdicionarLog($"✓ Lote de abertura enviado com sucesso!");
+                                // Se não recebeu protocolo, aguardar e tentar novamente ou informar erro
+                                AdicionarLog($"⚠ ATENÇÃO: Lote enviado mas protocolo não foi retornado!");
+                                AdicionarLog($"  Aguardando resposta do servidor...");
+                                
+                                // Tentar aguardar um pouco mais e verificar se há protocolo na resposta XML
+                                System.Threading.Thread.Sleep(2000);
+                                
+                                // Se ainda não tiver protocolo, registrar como erro
+                                if (idLoteBanco > 0)
+                                {
+                                    try
+                                    {
+                                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                        persistenceService.AtualizarLote(
+                                            idLoteBanco,
+                                            "ENVIADO_SEM_PROTOCOLO",
+                                            null,
+                                            resposta.CodigoResposta,
+                                            resposta.Descricao + " (Protocolo não retornado)",
+                                            resposta.XmlCompleto ?? "",
+                                            null,
+                                            null,
+                                            null,
+                                            DateTime.Now,
+                                            null,
+                                            "Protocolo não retornado pelo servidor"
+                                        );
+                                    }
+                                    catch (Exception exDb)
+                                    {
+                                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                                    }
+                                }
+                                
+                                MessageBox.Show(
+                                    $"Lote enviado, mas o protocolo não foi retornado pelo servidor.\n\n" +
+                                    $"Código de Resposta: {resposta.CodigoResposta}\n" +
+                                    $"Descrição: {resposta.Descricao}\n\n" +
+                                    $"Verifique o XML de resposta ou consulte o lote mais tarde.",
+                                    "Aviso - Protocolo Não Recebido",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Warning
+                                );
                             }
                         }
                         else if (resposta.CodigoResposta == 7)
                         {
                             AdicionarLog($"✗ Lote de abertura REJEITADO - Código: {resposta.CodigoResposta}");
                             AdicionarLog($"  Descrição: {resposta.Descricao}");
+                            
+                            // Atualizar lote no banco com erro
+                            if (idLoteBanco > 0)
+                            {
+                                try
+                                {
+                                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                    string erroMsg = $"REJEITADO - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}";
+                                    persistenceService.AtualizarLote(
+                                        idLoteBanco,
+                                        "REJEITADO",
+                                        null,
+                                        resposta.CodigoResposta,
+                                        resposta.Descricao,
+                                        resposta.XmlCompleto ?? "",
+                                        null,
+                                        null,
+                                        null,
+                                        DateTime.Now,
+                                        null,
+                                        erroMsg
+                                    );
+                                    persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO_ERRO", erroMsg);
+                                }
+                                catch (Exception exDb)
+                                {
+                                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após rejeição: {exDb.Message}");
+                                }
+                            }
+                            
                             if (resposta.Ocorrencias != null && resposta.Ocorrencias.Count > 0)
                             {
                                 foreach (var ocorr in resposta.Ocorrencias)
@@ -726,6 +889,33 @@ namespace ExemploAssinadorXML.Forms
                         else
                         {
                             AdicionarLog($"⚠ Lote de abertura - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                            
+                            // Atualizar lote no banco com resposta
+                            if (idLoteBanco > 0)
+                            {
+                                try
+                                {
+                                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                    persistenceService.AtualizarLote(
+                                        idLoteBanco,
+                                        "ENVIADO_COM_RESPOSTA",
+                                        null,
+                                        resposta.CodigoResposta,
+                                        resposta.Descricao,
+                                        resposta.XmlCompleto ?? "",
+                                        null,
+                                        null,
+                                        null,
+                                        DateTime.Now,
+                                        null,
+                                        null
+                                    );
+                                }
+                                catch (Exception exDb)
+                                {
+                                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                                }
+                            }
                         }
                     }
                     catch (Exception exEnv)
@@ -932,6 +1122,34 @@ namespace ExemploAssinadorXML.Forms
 
                         if (cancelarProcessamento) break;
 
+                        // Registrar lote no banco após gerar XML
+                        int quantidadeEventos = pessoasLote.Count;
+                        long idLoteBanco = 0;
+                        try
+                        {
+                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                            string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : "HOMOLOG";
+                            idLoteBanco = persistenceService.RegistrarLote(
+                                TipoLote.Movimentacao,
+                                periodoStr,
+                                quantidadeEventos,
+                                config.CnpjDeclarante,
+                                arquivoXml,
+                                null, // Ainda não assinado
+                                null, // Ainda não criptografado
+                                ambienteStr
+                            );
+                            persistenceService.RegistrarLogLote(idLoteBanco, "GERACAO", $"XML gerado: {Path.GetFileName(arquivoXml)}");
+                            
+                            // Registrar eventos do lote
+                            persistenceService.RegistrarEventosDoLote(idLoteBanco, pessoasLote);
+                            AdicionarLog($"Lote {lotesGerados} registrado no banco (ID: {idLoteBanco}).");
+                        }
+                        catch (Exception exDb)
+                        {
+                            AdicionarLog($"⚠ Aviso: Erro ao registrar lote no banco: {exDb.Message}");
+                        }
+
                         // Assinar
                         AtualizarEtapa($"Assinando lote {lotesGerados}...");
                         var assinaturaService = new EfinanceiraAssinaturaService();
@@ -943,6 +1161,21 @@ namespace ExemploAssinadorXML.Forms
                         AtualizarEstatisticas();
                         AdicionarLog($"Lote {lotesGerados} assinado.");
 
+                        // Atualizar lote no banco após assinar
+                        if (idLoteBanco > 0)
+                        {
+                            try
+                            {
+                                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                persistenceService.AtualizarLote(idLoteBanco, "ASSINADO");
+                                persistenceService.RegistrarLogLote(idLoteBanco, "ASSINATURA", $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                            }
+                            catch (Exception exDb)
+                            {
+                                AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após assinatura: {exDb.Message}");
+                            }
+                        }
+
                         if (cancelarProcessamento) break;
 
                         // Criptografar
@@ -953,10 +1186,24 @@ namespace ExemploAssinadorXML.Forms
                         AtualizarEstatisticas();
                         AdicionarLog($"Lote {lotesGerados} criptografado.");
 
+                        // Atualizar lote no banco após criptografar
+                        if (idLoteBanco > 0)
+                        {
+                            try
+                            {
+                                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                persistenceService.AtualizarLote(idLoteBanco, "CRIPTOGRAFADO");
+                                persistenceService.RegistrarLogLote(idLoteBanco, "CRIPTOGRAFIA", $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
+                            }
+                            catch (Exception exDb)
+                            {
+                                AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após criptografia: {exDb.Message}");
+                            }
+                        }
+
                         if (cancelarProcessamento) break;
 
-                        // Registrar lote processado (mesmo sem envio)
-                        int quantidadeEventos = pessoasLote.Count;
+                        // Registrar lote processado (mesmo sem envio) - manter compatibilidade com sistema antigo
                         ProtocoloPersistenciaService.RegistrarProtocolo(
                             TipoLote.Movimentacao,
                             arquivoCriptografado,
@@ -979,6 +1226,7 @@ namespace ExemploAssinadorXML.Forms
                                 
                                 if (resposta.CodigoResposta == 1)
                                 {
+                                    // AGUARDAR PROTOCOLO - Não finalizar sem protocolo
                                     if (!string.IsNullOrEmpty(resposta.Protocolo))
                                     {
                                         // Adicionar protocolo à lista
@@ -993,7 +1241,36 @@ namespace ExemploAssinadorXML.Forms
                                         AdicionarLog($"{resposta.Protocolo}");
                                         AdicionarLog($"════════════════════════════════════════");
                                         
-                                        // Atualizar protocolo no lote já registrado
+                                        // Atualizar lote no banco após envio
+                                        if (idLoteBanco > 0)
+                                        {
+                                            try
+                                            {
+                                                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                                string xmlResposta = resposta.XmlCompleto ?? "";
+                                                persistenceService.AtualizarLote(
+                                                    idLoteBanco,
+                                                    "ENVIADO",
+                                                    resposta.Protocolo,
+                                                    resposta.CodigoResposta,
+                                                    resposta.Descricao,
+                                                    xmlResposta,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    DateTime.Now,
+                                                    null,
+                                                    null
+                                                );
+                                                persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {resposta.Protocolo}");
+                                            }
+                                            catch (Exception exDb)
+                                            {
+                                                AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após envio: {exDb.Message}");
+                                            }
+                                        }
+                                        
+                                        // Atualizar protocolo no lote já registrado (sistema antigo)
                                         ProtocoloPersistenciaService.RegistrarProtocolo(
                                             TipoLote.Movimentacao, 
                                             arquivoCriptografado, 
@@ -1028,13 +1305,85 @@ namespace ExemploAssinadorXML.Forms
                                     }
                                     else
                                     {
-                                        AdicionarLog($"✓ Lote {lotesGerados} enviado com sucesso!");
+                                        // Se não recebeu protocolo, aguardar e tentar novamente ou informar erro
+                                        AdicionarLog($"⚠ ATENÇÃO: Lote {lotesGerados} enviado mas protocolo não foi retornado!");
+                                        AdicionarLog($"  Aguardando resposta do servidor...");
+                                        
+                                        // Tentar aguardar um pouco mais e verificar se há protocolo na resposta XML
+                                        System.Threading.Thread.Sleep(2000);
+                                        
+                                        // Se ainda não tiver protocolo, registrar como erro
+                                        if (idLoteBanco > 0)
+                                        {
+                                            try
+                                            {
+                                                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                                persistenceService.AtualizarLote(
+                                                    idLoteBanco,
+                                                    "ENVIADO_SEM_PROTOCOLO",
+                                                    null,
+                                                    resposta.CodigoResposta,
+                                                    resposta.Descricao + " (Protocolo não retornado)",
+                                                    resposta.XmlCompleto ?? "",
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    DateTime.Now,
+                                                    null,
+                                                    "Protocolo não retornado pelo servidor"
+                                                );
+                                            }
+                                            catch (Exception exDb)
+                                            {
+                                                AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                                            }
+                                        }
+                                        
+                                        MessageBox.Show(
+                                            $"Lote {lotesGerados} enviado, mas o protocolo não foi retornado pelo servidor.\n\n" +
+                                            $"Código de Resposta: {resposta.CodigoResposta}\n" +
+                                            $"Descrição: {resposta.Descricao}\n\n" +
+                                            $"Verifique o XML de resposta ou consulte o lote mais tarde.",
+                                            "Aviso - Protocolo Não Recebido",
+                                            MessageBoxButtons.OK,
+                                            MessageBoxIcon.Warning
+                                        );
                                     }
                                 }
                                 else if (resposta.CodigoResposta == 7)
                                 {
                                     AdicionarLog($"✗ Lote {lotesGerados} REJEITADO - Código: {resposta.CodigoResposta}");
                                     AdicionarLog($"  Descrição: {resposta.Descricao}");
+                                    
+                                    // Atualizar lote no banco com erro
+                                    if (idLoteBanco > 0)
+                                    {
+                                        try
+                                        {
+                                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                            string erroMsg = $"REJEITADO - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}";
+                                            persistenceService.AtualizarLote(
+                                                idLoteBanco,
+                                                "REJEITADO",
+                                                null,
+                                                resposta.CodigoResposta,
+                                                resposta.Descricao,
+                                                resposta.XmlCompleto ?? "",
+                                                null,
+                                                null,
+                                                null,
+                                                DateTime.Now,
+                                                null,
+                                                erroMsg
+                                            );
+                                            persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO_ERRO", erroMsg);
+                                        }
+                                        catch (Exception exDb)
+                                        {
+                                            AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após rejeição: {exDb.Message}");
+                                        }
+                                    }
+                                    
                                     if (resposta.Ocorrencias != null && resposta.Ocorrencias.Count > 0)
                                     {
                                         foreach (var ocorr in resposta.Ocorrencias)
@@ -1046,6 +1395,33 @@ namespace ExemploAssinadorXML.Forms
                                 else
                                 {
                                     AdicionarLog($"⚠ Lote {lotesGerados} - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                                    
+                                    // Atualizar lote no banco com resposta
+                                    if (idLoteBanco > 0)
+                                    {
+                                        try
+                                        {
+                                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                            persistenceService.AtualizarLote(
+                                                idLoteBanco,
+                                                "ENVIADO_COM_RESPOSTA",
+                                                null,
+                                                resposta.CodigoResposta,
+                                                resposta.Descricao,
+                                                resposta.XmlCompleto ?? "",
+                                                null,
+                                                null,
+                                                null,
+                                                DateTime.Now,
+                                                null,
+                                                null
+                                            );
+                                        }
+                                        catch (Exception exDb)
+                                        {
+                                            AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                                        }
+                                    }
                                 }
                             }
                             catch (Exception exEnv)
@@ -1140,6 +1516,38 @@ namespace ExemploAssinadorXML.Forms
 
                 if (cancelarProcessamento) return;
 
+                // Registrar lote no banco após gerar XML
+                int quantidadeEventos = ProtocoloPersistenciaService.ContarEventosNoXml(arquivoXml);
+                long idLoteBanco = 0;
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : "HOMOLOG";
+                    idLoteBanco = persistenceService.RegistrarLote(
+                        TipoLote.Fechamento,
+                        config.Periodo,
+                        quantidadeEventos,
+                        config.CnpjDeclarante,
+                        arquivoXml,
+                        null, // Ainda não assinado
+                        null, // Ainda não criptografado
+                        ambienteStr
+                    );
+                    persistenceService.RegistrarLogLote(idLoteBanco, "GERACAO", $"XML gerado: {Path.GetFileName(arquivoXml)}");
+                    AdicionarLog($"Lote registrado no banco (ID: {idLoteBanco}).");
+                }
+                catch (Exception exDb)
+                {
+                    string erroCompleto = $"⚠ ERRO ao registrar lote no banco: {exDb.Message}";
+                    if (exDb.InnerException != null)
+                    {
+                        erroCompleto += $"\nDetalhes: {exDb.InnerException.Message}";
+                    }
+                    AdicionarLog(erroCompleto);
+                    MessageBox.Show($"Erro ao registrar lote no banco de dados:\n\n{erroCompleto}", 
+                        "Erro de Banco de Dados", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
                 // 2. Assinar
                 AtualizarEtapa("Assinando XML...");
                 var assinaturaService = new EfinanceiraAssinaturaService();
@@ -1151,6 +1559,21 @@ namespace ExemploAssinadorXML.Forms
                 AtualizarEstatisticas();
                 AdicionarLog($"XML assinado: {arquivoAssinado}");
 
+                // Atualizar lote no banco após assinar
+                if (idLoteBanco > 0)
+                {
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        persistenceService.AtualizarLote(idLoteBanco, "ASSINADO");
+                        persistenceService.RegistrarLogLote(idLoteBanco, "ASSINATURA", $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                    }
+                    catch (Exception exDb)
+                    {
+                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após assinatura: {exDb.Message}");
+                    }
+                }
+
                 if (cancelarProcessamento) return;
 
                 // 3. Criptografar
@@ -1161,10 +1584,24 @@ namespace ExemploAssinadorXML.Forms
                 AtualizarEstatisticas();
                 AdicionarLog($"XML criptografado: {arquivoCriptografado}");
 
+                // Atualizar lote no banco após criptografar
+                if (idLoteBanco > 0)
+                {
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        persistenceService.AtualizarLote(idLoteBanco, "CRIPTOGRAFADO");
+                        persistenceService.RegistrarLogLote(idLoteBanco, "CRIPTOGRAFIA", $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
+                    }
+                    catch (Exception exDb)
+                    {
+                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após criptografia: {exDb.Message}");
+                    }
+                }
+
                 if (cancelarProcessamento) return;
 
-                // Registrar lote processado (mesmo sem envio)
-                int quantidadeEventos = ProtocoloPersistenciaService.ContarEventosNoXml(arquivoAssinado);
+                // Registrar lote processado (mesmo sem envio) - manter compatibilidade com sistema antigo
                 ProtocoloPersistenciaService.RegistrarProtocolo(
                     TipoLote.Fechamento,
                     arquivoCriptografado,
@@ -1187,6 +1624,7 @@ namespace ExemploAssinadorXML.Forms
                         
                         if (resposta.CodigoResposta == 1)
                         {
+                            // AGUARDAR PROTOCOLO - Não finalizar sem protocolo
                             if (!string.IsNullOrEmpty(resposta.Protocolo))
                             {
                                 // Adicionar protocolo à lista
@@ -1201,7 +1639,36 @@ namespace ExemploAssinadorXML.Forms
                                 AdicionarLog($"{resposta.Protocolo}");
                                 AdicionarLog($"════════════════════════════════════════");
                                 
-                                // Atualizar protocolo no lote já registrado
+                                // Atualizar lote no banco após envio
+                                if (idLoteBanco > 0)
+                                {
+                                    try
+                                    {
+                                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                        string xmlResposta = resposta.XmlCompleto ?? "";
+                                        persistenceService.AtualizarLote(
+                                            idLoteBanco,
+                                            "ENVIADO",
+                                            resposta.Protocolo,
+                                            resposta.CodigoResposta,
+                                            resposta.Descricao,
+                                            xmlResposta,
+                                            null,
+                                            null,
+                                            null,
+                                            DateTime.Now,
+                                            null,
+                                            null
+                                        );
+                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {resposta.Protocolo}");
+                                    }
+                                    catch (Exception exDb)
+                                    {
+                                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após envio: {exDb.Message}");
+                                    }
+                                }
+                                
+                                // Atualizar protocolo no lote já registrado (sistema antigo)
                                 ProtocoloPersistenciaService.RegistrarProtocolo(
                                     TipoLote.Fechamento, 
                                     arquivoCriptografado, 
@@ -1236,13 +1703,85 @@ namespace ExemploAssinadorXML.Forms
                             }
                             else
                             {
-                                AdicionarLog($"✓ Lote de fechamento enviado com sucesso!");
+                                // Se não recebeu protocolo, aguardar e tentar novamente ou informar erro
+                                AdicionarLog($"⚠ ATENÇÃO: Lote de fechamento enviado mas protocolo não foi retornado!");
+                                AdicionarLog($"  Aguardando resposta do servidor...");
+                                
+                                // Tentar aguardar um pouco mais e verificar se há protocolo na resposta XML
+                                System.Threading.Thread.Sleep(2000);
+                                
+                                // Se ainda não tiver protocolo, registrar como erro
+                                if (idLoteBanco > 0)
+                                {
+                                    try
+                                    {
+                                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                        persistenceService.AtualizarLote(
+                                            idLoteBanco,
+                                            "ENVIADO_SEM_PROTOCOLO",
+                                            null,
+                                            resposta.CodigoResposta,
+                                            resposta.Descricao + " (Protocolo não retornado)",
+                                            resposta.XmlCompleto ?? "",
+                                            null,
+                                            null,
+                                            null,
+                                            DateTime.Now,
+                                            null,
+                                            "Protocolo não retornado pelo servidor"
+                                        );
+                                    }
+                                    catch (Exception exDb)
+                                    {
+                                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                                    }
+                                }
+                                
+                                MessageBox.Show(
+                                    $"Lote de fechamento enviado, mas o protocolo não foi retornado pelo servidor.\n\n" +
+                                    $"Código de Resposta: {resposta.CodigoResposta}\n" +
+                                    $"Descrição: {resposta.Descricao}\n\n" +
+                                    $"Verifique o XML de resposta ou consulte o lote mais tarde.",
+                                    "Aviso - Protocolo Não Recebido",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Warning
+                                );
                             }
                         }
                         else if (resposta.CodigoResposta == 7)
                         {
                             AdicionarLog($"✗ Lote de fechamento REJEITADO - Código: {resposta.CodigoResposta}");
                             AdicionarLog($"  Descrição: {resposta.Descricao}");
+                            
+                            // Atualizar lote no banco com erro
+                            if (idLoteBanco > 0)
+                            {
+                                try
+                                {
+                                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                    string erroMsg = $"REJEITADO - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}";
+                                    persistenceService.AtualizarLote(
+                                        idLoteBanco,
+                                        "REJEITADO",
+                                        null,
+                                        resposta.CodigoResposta,
+                                        resposta.Descricao,
+                                        resposta.XmlCompleto ?? "",
+                                        null,
+                                        null,
+                                        null,
+                                        DateTime.Now,
+                                        null,
+                                        erroMsg
+                                    );
+                                    persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO_ERRO", erroMsg);
+                                }
+                                catch (Exception exDb)
+                                {
+                                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após rejeição: {exDb.Message}");
+                                }
+                            }
+                            
                             if (resposta.Ocorrencias != null && resposta.Ocorrencias.Count > 0)
                             {
                                 foreach (var ocorr in resposta.Ocorrencias)
@@ -1254,6 +1793,33 @@ namespace ExemploAssinadorXML.Forms
                         else
                         {
                             AdicionarLog($"⚠ Lote de fechamento - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                            
+                            // Atualizar lote no banco com resposta
+                            if (idLoteBanco > 0)
+                            {
+                                try
+                                {
+                                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                    persistenceService.AtualizarLote(
+                                        idLoteBanco,
+                                        "ENVIADO_COM_RESPOSTA",
+                                        null,
+                                        resposta.CodigoResposta,
+                                        resposta.Descricao,
+                                        resposta.XmlCompleto ?? "",
+                                        null,
+                                        null,
+                                        null,
+                                        DateTime.Now,
+                                        null,
+                                        null
+                                    );
+                                }
+                                catch (Exception exDb)
+                                {
+                                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                                }
+                            }
                         }
                     }
                     catch (Exception exEnv)

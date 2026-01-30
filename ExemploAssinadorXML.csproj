@@ -126,6 +126,7 @@
     <Compile Include="Services\EfinanceiraGeradorXmlService.cs" />
     <Compile Include="Services\EfinanceiraPeriodoUtil.cs" />
     <Compile Include="Services\EfinanceiraDatabaseService.cs" />
+    <Compile Include="Services\EfinanceiraDatabasePersistenceService.cs" />
     <Compile Include="Services\RSAPKCS1SHA256SignatureDescription.cs" />
     <Compile Include="Services\ConfiguracaoPersistenciaService.cs" />
     <Compile Include="Services\ProtocoloPersistenciaService.cs" />
