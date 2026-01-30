@@ -149,14 +149,41 @@ namespace ExemploAssinadorXML.Services
                     resposta.Descricao = descRespostaNode.InnerText.Trim();
                 }
 
-                // Buscar protocoloEnvio (protocolo)
-                XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
-                    ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
-                    ?? doc.SelectSingleNode("//protocolo")
-                    ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
-                if (protocoloNode != null)
+                // Buscar protocoloEnvio (protocolo) - seguindo a lógica do Java
+                // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
+                XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
+                if (protocoloList != null && protocoloList.Count > 0)
                 {
-                    resposta.Protocolo = protocoloNode.InnerText.Trim();
+                    resposta.Protocolo = protocoloList[0].InnerText.Trim();
+                    System.Diagnostics.Debug.WriteLine($"Protocolo encontrado via GetElementsByTagName: {resposta.Protocolo}");
+                }
+                else
+                {
+                    // Tentar com XPath (com namespace)
+                    XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
+                        ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
+                        ?? doc.SelectSingleNode("//protocolo")
+                        ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                    if (protocoloNode != null)
+                    {
+                        resposta.Protocolo = protocoloNode.InnerText.Trim();
+                        System.Diagnostics.Debug.WriteLine($"Protocolo encontrado via XPath: {resposta.Protocolo}");
+                    }
+                    else
+                    {
+                        // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
+                        XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                        if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
+                        {
+                            resposta.Protocolo = numeroProtocoloList[0].InnerText.Trim();
+                            System.Diagnostics.Debug.WriteLine($"Protocolo encontrado via numeroProtocolo: {resposta.Protocolo}");
+                        }
+                        else
+                        {
+                            // Log para debug se não encontrou protocolo
+                            System.Diagnostics.Debug.WriteLine("AVISO: Protocolo não encontrado no XML de resposta. XML: " + resposta.XmlCompleto.Substring(0, Math.Min(500, resposta.XmlCompleto.Length)));
+                        }
+                    }
                 }
 
                 // Buscar ocorrências

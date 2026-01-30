@@ -11,7 +11,7 @@
     <DiretorioLotes>C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\bin\Debug\lotes</DiretorioLotes>
     <PageSize>3</PageSize>
     <EventoOffset>0</EventoOffset>
-    <OffsetRegistros>61</OffsetRegistros>
+    <OffsetRegistros>66</OffsetRegistros>
     <MaxLotes>1</MaxLotes>
     <EventosPorLote>1</EventosPorLote>
     <UrlTeste>https://pre-efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto</UrlTeste>
@@ -82,5 +82,5 @@
     <FechamentoMovOpFinAnual xsi:nil="true" />
     <ContasAReportarEntDecExterior xsi:nil="true" />
   </DadosFechamento>
-  <DataSalvamento>2026-01-30T11:09:46.7444589-03:00</DataSalvamento>
+  <DataSalvamento>2026-01-30T13:40:06.6070375-03:00</DataSalvamento>
 </ConfiguracaoCompleta>

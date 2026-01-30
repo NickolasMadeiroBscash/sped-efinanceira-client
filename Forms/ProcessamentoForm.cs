@@ -720,19 +720,74 @@ namespace ExemploAssinadorXML.Forms
                         
                         if (resposta.CodigoResposta == 1)
                         {
+                            // Garantir que o protocolo foi extraído (pode não ter vindo no objeto resposta)
+                            string protocoloFinal = resposta.Protocolo;
+                            
+                            // Se não veio no objeto resposta, tentar extrair do XML
+                            if (string.IsNullOrEmpty(protocoloFinal) && !string.IsNullOrEmpty(resposta.XmlCompleto))
+                            {
+                                try
+                                {
+                                    System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                                    doc.LoadXml(resposta.XmlCompleto);
+                                    
+                                    // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
+                                    System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
+                                    if (protocoloList != null && protocoloList.Count > 0)
+                                    {
+                                        protocoloFinal = protocoloList[0].InnerText.Trim();
+                                    }
+                                    else
+                                    {
+                                        // Tentar com XPath (com namespace)
+                                        System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
+                                        nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                        
+                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
+                                            ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
+                                            ?? doc.SelectSingleNode("//protocolo")
+                                            ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                        
+                                        if (protocoloNode != null)
+                                        {
+                                            protocoloFinal = protocoloNode.InnerText.Trim();
+                                        }
+                                        else
+                                        {
+                                            // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
+                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                                            if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
+                                            {
+                                                protocoloFinal = numeroProtocoloList[0].InnerText.Trim();
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (!string.IsNullOrEmpty(protocoloFinal))
+                                    {
+                                        resposta.Protocolo = protocoloFinal; // Atualizar no objeto resposta também
+                                        AdicionarLog($"✓ Protocolo extraído do XML: {protocoloFinal}");
+                                    }
+                                }
+                                catch (Exception exXml)
+                                {
+                                    AdicionarLog($"⚠ Erro ao extrair protocolo do XML: {exXml.Message}");
+                                }
+                            }
+                            
                             // AGUARDAR PROTOCOLO - Não finalizar sem protocolo
-                            if (!string.IsNullOrEmpty(resposta.Protocolo))
+                            if (!string.IsNullOrEmpty(protocoloFinal))
                             {
                                 // Adicionar protocolo à lista
-                                if (!status.ProtocolosEnviados.Contains(resposta.Protocolo))
+                                if (!status.ProtocolosEnviados.Contains(protocoloFinal))
                                 {
-                                    status.ProtocolosEnviados.Add(resposta.Protocolo);
+                                    status.ProtocolosEnviados.Add(protocoloFinal);
                                 }
                                 
-                                AdicionarLog($"✓ Lote de abertura enviado com sucesso! Protocolo: {resposta.Protocolo}");
+                                AdicionarLog($"✓ Lote de abertura enviado com sucesso! Protocolo: {protocoloFinal}");
                                 AdicionarLog($"════════════════════════════════════════");
                                 AdicionarLog($"PROTOCOLO DO LOTE DE ABERTURA:");
-                                AdicionarLog($"{resposta.Protocolo}");
+                                AdicionarLog($"{protocoloFinal}");
                                 AdicionarLog($"════════════════════════════════════════");
                                 
                                 // Atualizar lote no banco após envio
@@ -745,7 +800,7 @@ namespace ExemploAssinadorXML.Forms
                                         persistenceService.AtualizarLote(
                                             idLoteBanco,
                                             "ENVIADO",
-                                            resposta.Protocolo,
+                                            protocoloFinal,
                                             resposta.CodigoResposta,
                                             resposta.Descricao,
                                             xmlResposta,
@@ -756,7 +811,7 @@ namespace ExemploAssinadorXML.Forms
                                             null,
                                             null
                                         );
-                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {resposta.Protocolo}");
+                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
                                     }
                                     catch (Exception exDb)
                                     {
@@ -768,7 +823,7 @@ namespace ExemploAssinadorXML.Forms
                                 ProtocoloPersistenciaService.RegistrarProtocolo(
                                     TipoLote.Abertura, 
                                     arquivoCriptografado, 
-                                    resposta.Protocolo,
+                                    protocoloFinal,
                                     config.Periodo,
                                     quantidadeEventos
                                 );
@@ -788,7 +843,7 @@ namespace ExemploAssinadorXML.Forms
                                 // Exibir MessageBox destacando o protocolo
                                 MessageBox.Show(
                                     $"Lote de abertura enviado com sucesso!\n\n" +
-                                    $"PROTOCOLO: {resposta.Protocolo}\n\n" +
+                                    $"PROTOCOLO: {protocoloFinal}\n\n" +
                                     $"Este protocolo foi salvo e pode ser consultado na aba 'Consulta'.",
                                     "Envio Concluído",
                                     MessageBoxButtons.OK,
@@ -888,9 +943,96 @@ namespace ExemploAssinadorXML.Forms
                         }
                         else
                         {
+                            // SEMPRE tentar extrair e salvar o protocolo, mesmo se código não for 1
+                            string protocoloExtraido = resposta.Protocolo;
+                            
+                            // Se não veio no objeto resposta, tentar extrair do XML (seguindo lógica do Java)
+                            if (string.IsNullOrEmpty(protocoloExtraido) && !string.IsNullOrEmpty(resposta.XmlCompleto))
+                            {
+                                try
+                                {
+                                    System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                                    doc.LoadXml(resposta.XmlCompleto);
+                                    
+                                    // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
+                                    System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
+                                    if (protocoloList != null && protocoloList.Count > 0)
+                                    {
+                                        protocoloExtraido = protocoloList[0].InnerText.Trim();
+                                    }
+                                    else
+                                    {
+                                        // Tentar com XPath (com namespace)
+                                        System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
+                                        nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                        
+                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
+                                            ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
+                                            ?? doc.SelectSingleNode("//protocolo")
+                                            ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                        
+                                        if (protocoloNode != null)
+                                        {
+                                            protocoloExtraido = protocoloNode.InnerText.Trim();
+                                        }
+                                        else
+                                        {
+                                            // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
+                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                                            if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
+                                            {
+                                                protocoloExtraido = numeroProtocoloList[0].InnerText.Trim();
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (!string.IsNullOrEmpty(protocoloExtraido))
+                                    {
+                                        AdicionarLog($"✓ Protocolo extraído do XML: {protocoloExtraido}");
+                                    }
+                                }
+                                catch (Exception exXml)
+                                {
+                                    AdicionarLog($"⚠ Erro ao extrair protocolo do XML: {exXml.Message}");
+                                    System.Diagnostics.Debug.WriteLine($"Erro ao extrair protocolo do XML: {exXml.Message}");
+                                }
+                            }
+                            
+                            if (!string.IsNullOrEmpty(protocoloExtraido))
+                            {
+                                AdicionarLog($"✓ Protocolo extraído: {protocoloExtraido}");
+                                
+                                // Adicionar protocolo à lista
+                                if (!status.ProtocolosEnviados.Contains(protocoloExtraido))
+                                {
+                                    status.ProtocolosEnviados.Add(protocoloExtraido);
+                                }
+                                
+                                // Atualizar protocolo no lote já registrado (sistema antigo)
+                                ProtocoloPersistenciaService.RegistrarProtocolo(
+                                    TipoLote.Abertura, 
+                                    arquivoCriptografado, 
+                                    protocoloExtraido,
+                                    config.Periodo,
+                                    quantidadeEventos
+                                );
+                                
+                                // Aguardar um momento para garantir que o protocolo foi salvo
+                                System.Threading.Thread.Sleep(500);
+                                
+                                // Atualizar lista na aba Consulta
+                                if (ConsultaForm != null)
+                                {
+                                    this.Invoke((MethodInvoker)delegate
+                                    {
+                                        ConsultaForm.AtualizarListaLotes();
+                                    });
+                                }
+                            }
+                            
                             AdicionarLog($"⚠ Lote de abertura - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
                             
-                            // Atualizar lote no banco com resposta
+                            // Atualizar lote no banco com resposta e protocolo (se encontrado)
                             if (idLoteBanco > 0)
                             {
                                 try
@@ -899,7 +1041,7 @@ namespace ExemploAssinadorXML.Forms
                                     persistenceService.AtualizarLote(
                                         idLoteBanco,
                                         "ENVIADO_COM_RESPOSTA",
-                                        null,
+                                        protocoloExtraido, // Salvar protocolo mesmo se código não for 1
                                         resposta.CodigoResposta,
                                         resposta.Descricao,
                                         resposta.XmlCompleto ?? "",
@@ -910,6 +1052,12 @@ namespace ExemploAssinadorXML.Forms
                                         null,
                                         null
                                     );
+                                    
+                                    if (!string.IsNullOrEmpty(protocoloExtraido))
+                                    {
+                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", 
+                                            $"Lote enviado. Protocolo: {protocoloExtraido}, Código: {resposta.CodigoResposta}");
+                                    }
                                 }
                                 catch (Exception exDb)
                                 {
@@ -1226,19 +1374,74 @@ namespace ExemploAssinadorXML.Forms
                                 
                                 if (resposta.CodigoResposta == 1)
                                 {
+                                    // Garantir que o protocolo foi extraído (pode não ter vindo no objeto resposta)
+                                    string protocoloFinal = resposta.Protocolo;
+                                    
+                                    // Se não veio no objeto resposta, tentar extrair do XML
+                                    if (string.IsNullOrEmpty(protocoloFinal) && !string.IsNullOrEmpty(resposta.XmlCompleto))
+                                    {
+                                        try
+                                        {
+                                            System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                                            doc.LoadXml(resposta.XmlCompleto);
+                                            
+                                            // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
+                                            System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
+                                            if (protocoloList != null && protocoloList.Count > 0)
+                                            {
+                                                protocoloFinal = protocoloList[0].InnerText.Trim();
+                                            }
+                                            else
+                                            {
+                                                // Tentar com XPath (com namespace)
+                                                System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
+                                                nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                                
+                                                System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
+                                                    ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
+                                                    ?? doc.SelectSingleNode("//protocolo")
+                                                    ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                                
+                                                if (protocoloNode != null)
+                                                {
+                                                    protocoloFinal = protocoloNode.InnerText.Trim();
+                                                }
+                                                else
+                                                {
+                                                    // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
+                                                    System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                                                    if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
+                                                    {
+                                                        protocoloFinal = numeroProtocoloList[0].InnerText.Trim();
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if (!string.IsNullOrEmpty(protocoloFinal))
+                                            {
+                                                resposta.Protocolo = protocoloFinal; // Atualizar no objeto resposta também
+                                                AdicionarLog($"✓ Protocolo extraído do XML: {protocoloFinal}");
+                                            }
+                                        }
+                                        catch (Exception exXml)
+                                        {
+                                            AdicionarLog($"⚠ Erro ao extrair protocolo do XML: {exXml.Message}");
+                                        }
+                                    }
+                                    
                                     // AGUARDAR PROTOCOLO - Não finalizar sem protocolo
-                                    if (!string.IsNullOrEmpty(resposta.Protocolo))
+                                    if (!string.IsNullOrEmpty(protocoloFinal))
                                     {
                                         // Adicionar protocolo à lista
-                                        if (!status.ProtocolosEnviados.Contains(resposta.Protocolo))
+                                        if (!status.ProtocolosEnviados.Contains(protocoloFinal))
                                         {
-                                            status.ProtocolosEnviados.Add(resposta.Protocolo);
+                                            status.ProtocolosEnviados.Add(protocoloFinal);
                                         }
                                         
-                                        AdicionarLog($"✓ Lote {lotesGerados} enviado com sucesso! Protocolo: {resposta.Protocolo}");
+                                        AdicionarLog($"✓ Lote {lotesGerados} enviado com sucesso! Protocolo: {protocoloFinal}");
                                         AdicionarLog($"════════════════════════════════════════");
                                         AdicionarLog($"PROTOCOLO DO LOTE {lotesGerados} DE MOVIMENTAÇÃO:");
-                                        AdicionarLog($"{resposta.Protocolo}");
+                                        AdicionarLog($"{protocoloFinal}");
                                         AdicionarLog($"════════════════════════════════════════");
                                         
                                         // Atualizar lote no banco após envio
@@ -1251,7 +1454,7 @@ namespace ExemploAssinadorXML.Forms
                                                 persistenceService.AtualizarLote(
                                                     idLoteBanco,
                                                     "ENVIADO",
-                                                    resposta.Protocolo,
+                                                    protocoloFinal,
                                                     resposta.CodigoResposta,
                                                     resposta.Descricao,
                                                     xmlResposta,
@@ -1262,7 +1465,7 @@ namespace ExemploAssinadorXML.Forms
                                                     null,
                                                     null
                                                 );
-                                                persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {resposta.Protocolo}");
+                                                persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
                                             }
                                             catch (Exception exDb)
                                             {
@@ -1274,7 +1477,7 @@ namespace ExemploAssinadorXML.Forms
                                         ProtocoloPersistenciaService.RegistrarProtocolo(
                                             TipoLote.Movimentacao, 
                                             arquivoCriptografado, 
-                                            resposta.Protocolo,
+                                            protocoloFinal,
                                             periodoStr,
                                             quantidadeEventos
                                         );
@@ -1294,7 +1497,7 @@ namespace ExemploAssinadorXML.Forms
                                         // Exibir MessageBox destacando o protocolo
                                         MessageBox.Show(
                                             $"Lote {lotesGerados} de movimentação enviado com sucesso!\n\n" +
-                                            $"PROTOCOLO: {resposta.Protocolo}\n\n" +
+                                            $"PROTOCOLO: {protocoloFinal}\n\n" +
                                             $"Este protocolo foi salvo e pode ser consultado na aba 'Consulta'.",
                                             "Envio Concluído",
                                             MessageBoxButtons.OK,
@@ -1394,9 +1597,71 @@ namespace ExemploAssinadorXML.Forms
                                 }
                                 else
                                 {
+                                    // SEMPRE tentar extrair e salvar o protocolo, mesmo se código não for 1
+                                    string protocoloExtraido = resposta.Protocolo;
+                                    
+                                    // Se não veio no objeto resposta, tentar extrair do XML
+                                    if (string.IsNullOrEmpty(protocoloExtraido) && !string.IsNullOrEmpty(resposta.XmlCompleto))
+                                    {
+                                        try
+                                        {
+                                            System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                                            doc.LoadXml(resposta.XmlCompleto);
+                                            
+                                            System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
+                                            nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                            
+                                            System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
+                                                ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
+                                                ?? doc.SelectSingleNode("//protocolo")
+                                                ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                            
+                                            if (protocoloNode != null)
+                                            {
+                                                protocoloExtraido = protocoloNode.InnerText.Trim();
+                                            }
+                                        }
+                                        catch (Exception exXml)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"Erro ao extrair protocolo do XML: {exXml.Message}");
+                                        }
+                                    }
+                                    
+                                    if (!string.IsNullOrEmpty(protocoloExtraido))
+                                    {
+                                        AdicionarLog($"✓ Protocolo extraído: {protocoloExtraido}");
+                                        
+                                        // Adicionar protocolo à lista
+                                        if (!status.ProtocolosEnviados.Contains(protocoloExtraido))
+                                        {
+                                            status.ProtocolosEnviados.Add(protocoloExtraido);
+                                        }
+                                        
+                                        // Atualizar protocolo no lote já registrado (sistema antigo)
+                                        ProtocoloPersistenciaService.RegistrarProtocolo(
+                                            TipoLote.Movimentacao, 
+                                            arquivoCriptografado, 
+                                            protocoloExtraido,
+                                            periodoStr,
+                                            quantidadeEventos
+                                        );
+                                        
+                                        // Aguardar um momento para garantir que o protocolo foi salvo
+                                        System.Threading.Thread.Sleep(500);
+                                        
+                                        // Atualizar lista na aba Consulta
+                                        if (ConsultaForm != null)
+                                        {
+                                            this.Invoke((MethodInvoker)delegate
+                                            {
+                                                ConsultaForm.AtualizarListaLotes();
+                                            });
+                                        }
+                                    }
+                                    
                                     AdicionarLog($"⚠ Lote {lotesGerados} - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
                                     
-                                    // Atualizar lote no banco com resposta
+                                    // Atualizar lote no banco com resposta e protocolo (se encontrado)
                                     if (idLoteBanco > 0)
                                     {
                                         try
@@ -1405,7 +1670,7 @@ namespace ExemploAssinadorXML.Forms
                                             persistenceService.AtualizarLote(
                                                 idLoteBanco,
                                                 "ENVIADO_COM_RESPOSTA",
-                                                null,
+                                                protocoloExtraido, // Salvar protocolo mesmo se código não for 1
                                                 resposta.CodigoResposta,
                                                 resposta.Descricao,
                                                 resposta.XmlCompleto ?? "",
@@ -1416,6 +1681,12 @@ namespace ExemploAssinadorXML.Forms
                                                 null,
                                                 null
                                             );
+                                            
+                                            if (!string.IsNullOrEmpty(protocoloExtraido))
+                                            {
+                                                persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", 
+                                                    $"Lote enviado. Protocolo: {protocoloExtraido}, Código: {resposta.CodigoResposta}");
+                                            }
                                         }
                                         catch (Exception exDb)
                                         {
@@ -1624,19 +1895,74 @@ namespace ExemploAssinadorXML.Forms
                         
                         if (resposta.CodigoResposta == 1)
                         {
+                            // Garantir que o protocolo foi extraído (pode não ter vindo no objeto resposta)
+                            string protocoloFinal = resposta.Protocolo;
+                            
+                            // Se não veio no objeto resposta, tentar extrair do XML
+                            if (string.IsNullOrEmpty(protocoloFinal) && !string.IsNullOrEmpty(resposta.XmlCompleto))
+                            {
+                                try
+                                {
+                                    System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                                    doc.LoadXml(resposta.XmlCompleto);
+                                    
+                                    // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
+                                    System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
+                                    if (protocoloList != null && protocoloList.Count > 0)
+                                    {
+                                        protocoloFinal = protocoloList[0].InnerText.Trim();
+                                    }
+                                    else
+                                    {
+                                        // Tentar com XPath (com namespace)
+                                        System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
+                                        nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                        
+                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
+                                            ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
+                                            ?? doc.SelectSingleNode("//protocolo")
+                                            ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                        
+                                        if (protocoloNode != null)
+                                        {
+                                            protocoloFinal = protocoloNode.InnerText.Trim();
+                                        }
+                                        else
+                                        {
+                                            // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
+                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                                            if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
+                                            {
+                                                protocoloFinal = numeroProtocoloList[0].InnerText.Trim();
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (!string.IsNullOrEmpty(protocoloFinal))
+                                    {
+                                        resposta.Protocolo = protocoloFinal; // Atualizar no objeto resposta também
+                                        AdicionarLog($"✓ Protocolo extraído do XML: {protocoloFinal}");
+                                    }
+                                }
+                                catch (Exception exXml)
+                                {
+                                    AdicionarLog($"⚠ Erro ao extrair protocolo do XML: {exXml.Message}");
+                                }
+                            }
+                            
                             // AGUARDAR PROTOCOLO - Não finalizar sem protocolo
-                            if (!string.IsNullOrEmpty(resposta.Protocolo))
+                            if (!string.IsNullOrEmpty(protocoloFinal))
                             {
                                 // Adicionar protocolo à lista
-                                if (!status.ProtocolosEnviados.Contains(resposta.Protocolo))
+                                if (!status.ProtocolosEnviados.Contains(protocoloFinal))
                                 {
-                                    status.ProtocolosEnviados.Add(resposta.Protocolo);
+                                    status.ProtocolosEnviados.Add(protocoloFinal);
                                 }
                                 
-                                AdicionarLog($"✓ Lote de fechamento enviado com sucesso! Protocolo: {resposta.Protocolo}");
+                                AdicionarLog($"✓ Lote de fechamento enviado com sucesso! Protocolo: {protocoloFinal}");
                                 AdicionarLog($"════════════════════════════════════════");
                                 AdicionarLog($"PROTOCOLO DO LOTE DE FECHAMENTO:");
-                                AdicionarLog($"{resposta.Protocolo}");
+                                AdicionarLog($"{protocoloFinal}");
                                 AdicionarLog($"════════════════════════════════════════");
                                 
                                 // Atualizar lote no banco após envio
@@ -1649,7 +1975,7 @@ namespace ExemploAssinadorXML.Forms
                                         persistenceService.AtualizarLote(
                                             idLoteBanco,
                                             "ENVIADO",
-                                            resposta.Protocolo,
+                                            protocoloFinal,
                                             resposta.CodigoResposta,
                                             resposta.Descricao,
                                             xmlResposta,
@@ -1660,7 +1986,7 @@ namespace ExemploAssinadorXML.Forms
                                             null,
                                             null
                                         );
-                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {resposta.Protocolo}");
+                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
                                     }
                                     catch (Exception exDb)
                                     {
@@ -1672,7 +1998,7 @@ namespace ExemploAssinadorXML.Forms
                                 ProtocoloPersistenciaService.RegistrarProtocolo(
                                     TipoLote.Fechamento, 
                                     arquivoCriptografado, 
-                                    resposta.Protocolo,
+                                    protocoloFinal,
                                     config.Periodo,
                                     quantidadeEventos
                                 );
@@ -1692,7 +2018,7 @@ namespace ExemploAssinadorXML.Forms
                                 // Exibir MessageBox destacando o protocolo
                                 MessageBox.Show(
                                     $"Lote de fechamento enviado com sucesso!\n\n" +
-                                    $"PROTOCOLO: {resposta.Protocolo}\n\n" +
+                                    $"PROTOCOLO: {protocoloFinal}\n\n" +
                                     $"Este protocolo foi salvo e pode ser consultado na aba 'Consulta'.",
                                     "Envio Concluído",
                                     MessageBoxButtons.OK,
@@ -1792,9 +2118,96 @@ namespace ExemploAssinadorXML.Forms
                         }
                         else
                         {
+                            // SEMPRE tentar extrair e salvar o protocolo, mesmo se código não for 1
+                            string protocoloExtraido = resposta.Protocolo;
+                            
+                            // Se não veio no objeto resposta, tentar extrair do XML (seguindo lógica do Java)
+                            if (string.IsNullOrEmpty(protocoloExtraido) && !string.IsNullOrEmpty(resposta.XmlCompleto))
+                            {
+                                try
+                                {
+                                    System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                                    doc.LoadXml(resposta.XmlCompleto);
+                                    
+                                    // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
+                                    System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
+                                    if (protocoloList != null && protocoloList.Count > 0)
+                                    {
+                                        protocoloExtraido = protocoloList[0].InnerText.Trim();
+                                    }
+                                    else
+                                    {
+                                        // Tentar com XPath (com namespace)
+                                        System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
+                                        nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                        
+                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
+                                            ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
+                                            ?? doc.SelectSingleNode("//protocolo")
+                                            ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                        
+                                        if (protocoloNode != null)
+                                        {
+                                            protocoloExtraido = protocoloNode.InnerText.Trim();
+                                        }
+                                        else
+                                        {
+                                            // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
+                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                                            if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
+                                            {
+                                                protocoloExtraido = numeroProtocoloList[0].InnerText.Trim();
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (!string.IsNullOrEmpty(protocoloExtraido))
+                                    {
+                                        AdicionarLog($"✓ Protocolo extraído do XML: {protocoloExtraido}");
+                                    }
+                                }
+                                catch (Exception exXml)
+                                {
+                                    AdicionarLog($"⚠ Erro ao extrair protocolo do XML: {exXml.Message}");
+                                    System.Diagnostics.Debug.WriteLine($"Erro ao extrair protocolo do XML: {exXml.Message}");
+                                }
+                            }
+                            
+                            if (!string.IsNullOrEmpty(protocoloExtraido))
+                            {
+                                AdicionarLog($"✓ Protocolo extraído: {protocoloExtraido}");
+                                
+                                // Adicionar protocolo à lista
+                                if (!status.ProtocolosEnviados.Contains(protocoloExtraido))
+                                {
+                                    status.ProtocolosEnviados.Add(protocoloExtraido);
+                                }
+                                
+                                // Atualizar protocolo no lote já registrado (sistema antigo)
+                                ProtocoloPersistenciaService.RegistrarProtocolo(
+                                    TipoLote.Fechamento, 
+                                    arquivoCriptografado, 
+                                    protocoloExtraido,
+                                    config.Periodo,
+                                    quantidadeEventos
+                                );
+                                
+                                // Aguardar um momento para garantir que o protocolo foi salvo
+                                System.Threading.Thread.Sleep(500);
+                                
+                                // Atualizar lista na aba Consulta
+                                if (ConsultaForm != null)
+                                {
+                                    this.Invoke((MethodInvoker)delegate
+                                    {
+                                        ConsultaForm.AtualizarListaLotes();
+                                    });
+                                }
+                            }
+                            
                             AdicionarLog($"⚠ Lote de fechamento - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
                             
-                            // Atualizar lote no banco com resposta
+                            // Atualizar lote no banco com resposta e protocolo (se encontrado)
                             if (idLoteBanco > 0)
                             {
                                 try
@@ -1803,7 +2216,7 @@ namespace ExemploAssinadorXML.Forms
                                     persistenceService.AtualizarLote(
                                         idLoteBanco,
                                         "ENVIADO_COM_RESPOSTA",
-                                        null,
+                                        protocoloExtraido, // Salvar protocolo mesmo se código não for 1
                                         resposta.CodigoResposta,
                                         resposta.Descricao,
                                         resposta.XmlCompleto ?? "",
@@ -1814,6 +2227,12 @@ namespace ExemploAssinadorXML.Forms
                                         null,
                                         null
                                     );
+                                    
+                                    if (!string.IsNullOrEmpty(protocoloExtraido))
+                                    {
+                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", 
+                                            $"Lote enviado. Protocolo: {protocoloExtraido}, Código: {resposta.CodigoResposta}");
+                                    }
                                 }
                                 catch (Exception exDb)
                                 {
