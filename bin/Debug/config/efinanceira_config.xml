@@ -7,11 +7,11 @@
     <Ambiente>TEST</Ambiente>
     <TestEnvioHabilitado>false</TestEnvioHabilitado>
     <ModoTeste>true</ModoTeste>
-    <Periodo>202301</Periodo>
+    <Periodo>202601</Periodo>
     <DiretorioLotes>C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\bin\Debug\lotes</DiretorioLotes>
-    <PageSize>3</PageSize>
+    <PageSize>1</PageSize>
     <EventoOffset>0</EventoOffset>
-    <OffsetRegistros>66</OffsetRegistros>
+    <OffsetRegistros>1</OffsetRegistros>
     <MaxLotes>1</MaxLotes>
     <EventosPorLote>1</EventosPorLote>
     <UrlTeste>https://pre-efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto</UrlTeste>
@@ -21,8 +21,8 @@
   </Config>
   <DadosAbertura>
     <CnpjDeclarante>40994589000105</CnpjDeclarante>
-    <DtInicio>2023-01-01</DtInicio>
-    <DtFim>2023-06-30</DtFim>
+    <DtInicio>2026-01-01</DtInicio>
+    <DtFim>2026-06-30</DtFim>
     <TipoAmbiente>2</TipoAmbiente>
     <AplicacaoEmissora>1</AplicacaoEmissora>
     <IndRetificacao>1</IndRetificacao>
@@ -70,8 +70,8 @@
   </DadosAbertura>
   <DadosFechamento>
     <CnpjDeclarante>40994589000105</CnpjDeclarante>
-    <DtInicio>2023-01-01</DtInicio>
-    <DtFim>2023-06-30</DtFim>
+    <DtInicio>2026-01-01</DtInicio>
+    <DtFim>2026-06-30</DtFim>
     <TipoAmbiente>2</TipoAmbiente>
     <AplicacaoEmissora>1</AplicacaoEmissora>
     <IndRetificacao>1</IndRetificacao>
@@ -82,5 +82,5 @@
     <FechamentoMovOpFinAnual xsi:nil="true" />
     <ContasAReportarEntDecExterior xsi:nil="true" />
   </DadosFechamento>
-  <DataSalvamento>2026-01-30T13:40:06.6070375-03:00</DataSalvamento>
+  <DataSalvamento>2026-01-30T13:44:25.6765743-03:00</DataSalvamento>
 </ConfiguracaoCompleta>
