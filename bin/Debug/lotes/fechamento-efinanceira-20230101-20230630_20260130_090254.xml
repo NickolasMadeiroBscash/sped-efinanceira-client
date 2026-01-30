@@ -5,7 +5,7 @@
     <eventos>
       <evento id="ID0">
         <eFinanceira xmlns="http://www.eFinanceira.gov.br/schemas/evtFechamentoeFinanceira/v1_3_0">
-          <evtFechamentoeFinanceira id="ID000001769747885839">
+          <evtFechamentoeFinanceira id="ID000001769774574863">
             <ideEvento>
               <indRetificacao>1</indRetificacao>
               <tpAmb>2</tpAmb>
@@ -16,8 +16,8 @@
               <cnpjDeclarante>40994589000105</cnpjDeclarante>
             </ideDeclarante>
             <infoFechamento>
-              <dtInicio>2022-01-01</dtInicio>
-              <dtFim>2022-06-30</dtFim>
+              <dtInicio>2023-01-01</dtInicio>
+              <dtFim>2023-06-30</dtFim>
               <sitEspecial>0</sitEspecial>
             </infoFechamento>
             <FechamentoMovOpFin>

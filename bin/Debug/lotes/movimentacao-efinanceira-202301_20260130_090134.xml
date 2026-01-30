@@ -5,7 +5,7 @@
     <eventos>
       <evento id="ID0">
         <eFinanceira xmlns="http://www.eFinanceira.gov.br/schemas/evtMovOpFin/v1_2_1">
-          <evtMovOpFin id="ID000000000000000113">
+          <evtMovOpFin id="ID000000000000000115">
             <ideEvento>
               <indRetificacao>1</indRetificacao>
               <tpAmb>2</tpAmb>
@@ -17,8 +17,8 @@
             </ideDeclarante>
             <ideDeclarado>
               <tpNI>1</tpNI>
-              <NIDeclarado>66224845387</NIDeclarado>
-              <NomeDeclarado>MARCIO MARCOLINO DA SILVA</NomeDeclarado>
+              <NIDeclarado>66878314372</NIDeclarado>
+              <NomeDeclarado>MARCOS ANTONIO GABRIEL DA SILVA</NomeDeclarado>
               <EnderecoLivre>5 DESEMBARGADOR MOREIRA 1300 ALDEOTA 60170-002</EnderecoLivre>
               <PaisEndereco>
                 <Pais>BR</Pais>
@@ -31,7 +31,7 @@
               </PaisNacionalidade>
             </ideDeclarado>
             <mesCaixa>
-              <anoMesCaixa>202201</anoMesCaixa>
+              <anoMesCaixa>202301</anoMesCaixa>
               <movOpFin>
                 <Conta>
                   <infoConta>
@@ -41,12 +41,12 @@
                     <tpConta>1</tpConta>
                     <subTpConta>105</subTpConta>
                     <tpNumConta>OECD605</tpNumConta>
-                    <numConta>1058</numConta>
+                    <numConta>1074</numConta>
                     <tpRelacaoDeclarado>1</tpRelacaoDeclarado>
                     <NoTitulares>1</NoTitulares>
                     <BalancoConta>
-                      <totCreditos>11000,00</totCreditos>
-                      <totDebitos>25000,00</totDebitos>
+                      <totCreditos>25000,00</totCreditos>
+                      <totDebitos>113000,00</totDebitos>
                       <totCreditosMesmaTitularidade>0,00</totCreditosMesmaTitularidade>
                       <totDebitosMesmaTitularidade>0,00</totDebitosMesmaTitularidade>
                       <vlrUltDia>1000000,00</vlrUltDia>

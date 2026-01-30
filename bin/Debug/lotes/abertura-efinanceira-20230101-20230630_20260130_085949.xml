@@ -1,0 +1,75 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<eFinanceira xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.eFinanceira.gov.br/schemas/envioLoteEventosAssincrono/v1_0_0">
+  <loteEventosAssincrono>
+    <cnpjDeclarante>40994589000105</cnpjDeclarante>
+    <eventos>
+      <evento id="ID0">
+        <eFinanceira xmlns="http://www.eFinanceira.gov.br/schemas/evtAberturaeFinanceira/v1_2_1">
+          <evtAberturaeFinanceira id="ID000001769774389651">
+            <ideEvento>
+              <indRetificacao>1</indRetificacao>
+              <tpAmb>2</tpAmb>
+              <aplicEmi>1</aplicEmi>
+              <verAplic>00000000000000000001</verAplic>
+            </ideEvento>
+            <ideDeclarante>
+              <cnpjDeclarante>40994589000105</cnpjDeclarante>
+            </ideDeclarante>
+            <infoAbertura>
+              <dtInicio>2023-01-01</dtInicio>
+              <dtFim>2023-06-30</dtFim>
+            </infoAbertura>
+            <AberturaMovOpFin>
+              <ResponsavelRMF>
+                <CNPJ>40994589000105</CNPJ>
+                <CPF>78325121726</CPF>
+                <Nome>Responsável RMF</Nome>
+                <Setor>Contabilidade</Setor>
+                <Telefone>
+                  <DDD>85</DDD>
+                  <Numero>30523500</Numero>
+                </Telefone>
+                <Endereco>
+                  <Logradouro>Avenida Desembargador Moreira</Logradouro>
+                  <Numero>1300</Numero>
+                  <Complemento>Sala 1307 T- Sul</Complemento>
+                  <Bairro>Aldeota</Bairro>
+                  <CEP>60170002</CEP>
+                  <Municipio>Fortaleza</Municipio>
+                  <UF>CE</UF>
+                </Endereco>
+              </ResponsavelRMF>
+              <RespeFin>
+                <CPF>39768628197</CPF>
+                <Nome>Responsável e-Financeira</Nome>
+                <Setor>Contabilidade</Setor>
+                <Telefone>
+                  <DDD>85</DDD>
+                  <Numero>30523500</Numero>
+                </Telefone>
+                <Endereco>
+                  <Logradouro>Avenida Desembargador Moreira</Logradouro>
+                  <Numero>1300</Numero>
+                  <Complemento>Sala 1307 T- Sul</Complemento>
+                  <Bairro>Aldeota</Bairro>
+                  <CEP>60170002</CEP>
+                  <Municipio>Fortaleza</Municipio>
+                  <UF>CE</UF>
+                </Endereco>
+                <Email>contabilidade@bscash.com.br</Email>
+              </RespeFin>
+              <RepresLegal>
+                <CPF>09684527870</CPF>
+                <Setor>Diretoria</Setor>
+                <Telefone>
+                  <DDD>11</DDD>
+                  <Numero>29760435</Numero>
+                </Telefone>
+              </RepresLegal>
+            </AberturaMovOpFin>
+          </evtAberturaeFinanceira>
+        </eFinanceira>
+      </evento>
+    </eventos>
+  </loteEventosAssincrono>
+</eFinanceira>
