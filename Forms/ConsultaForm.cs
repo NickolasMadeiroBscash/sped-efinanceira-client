@@ -131,6 +131,14 @@ namespace ExemploAssinadorXML.Forms
             BtnAtualizarLotes_Click(null, null);
         }
 
+        /// <summary>
+        /// Atualiza a lista de lotes processados (pode ser chamado externamente)
+        /// </summary>
+        public void AtualizarListaLotes()
+        {
+            BtnAtualizarLotes_Click(null, null);
+        }
+
         private void LstLotes_DoubleClick(object sender, EventArgs e)
         {
             if (lstLotes.SelectedIndex < 0) return;
@@ -180,26 +188,54 @@ namespace ExemploAssinadorXML.Forms
                 var resposta = consultaService.ConsultarProtocolo(txtProtocolo.Text, config, cert);
 
                 rtbResultado.Clear();
-                rtbResultado.AppendText("========================================\n");
-                rtbResultado.AppendText("RESULTADO DA CONSULTA\n");
-                rtbResultado.AppendText("========================================\n");
-                rtbResultado.AppendText($"Protocolo: {txtProtocolo.Text}\n");
-                rtbResultado.AppendText($"Código HTTP: {resposta.CodigoHttp}\n");
-                rtbResultado.AppendText($"Código Resposta: {resposta.CodigoResposta}\n");
-                rtbResultado.AppendText($"Descrição: {resposta.Descricao}\n\n");
+                rtbResultado.AppendText("═══════════════════════════════════════════════════════════\n");
+                rtbResultado.AppendText("                    RESULTADO DA CONSULTA\n");
+                rtbResultado.AppendText("═══════════════════════════════════════════════════════════\n\n");
+                
+                rtbResultado.AppendText($"📋 Protocolo: {txtProtocolo.Text}\n");
+                rtbResultado.AppendText($"🌐 Código HTTP: {resposta.CodigoHttp}\n");
+                rtbResultado.AppendText($"📊 Código Resposta: {resposta.CodigoResposta}\n");
+                rtbResultado.AppendText($"📝 Descrição: {resposta.Descricao}\n\n");
+
+                // Informações adicionais do lote
+                if (!string.IsNullOrEmpty(resposta.ProtocoloEnvio))
+                {
+                    rtbResultado.AppendText($"📤 Protocolo de Envio: {resposta.ProtocoloEnvio}\n");
+                }
+                if (resposta.DataRecepcao.HasValue)
+                {
+                    rtbResultado.AppendText($"📥 Data/Hora Recepção: {resposta.DataRecepcao.Value:dd/MM/yyyy HH:mm:ss}\n");
+                }
+                if (resposta.DataProcessamento.HasValue)
+                {
+                    rtbResultado.AppendText($"⚙️  Data/Hora Processamento: {resposta.DataProcessamento.Value:dd/MM/yyyy HH:mm:ss}\n");
+                }
+                if (!string.IsNullOrEmpty(resposta.VersaoAplicativoRecepcao))
+                {
+                    rtbResultado.AppendText($"🔢 Versão Aplicativo Recepção: {resposta.VersaoAplicativoRecepcao}\n");
+                }
+                if (!string.IsNullOrEmpty(resposta.VersaoAplicativoProcessamento))
+                {
+                    rtbResultado.AppendText($"🔢 Versão Aplicativo Processamento: {resposta.VersaoAplicativoProcessamento}\n");
+                }
+
+                rtbResultado.AppendText("\n");
+                rtbResultado.AppendText("═══════════════════════════════════════════════════════════\n");
+                rtbResultado.AppendText("                         STATUS DO LOTE\n");
+                rtbResultado.AppendText("═══════════════════════════════════════════════════════════\n\n");
 
                 // Interpretar códigos de resposta baseado no Java de referência
                 if (resposta.CodigoResposta == 1)
                 {
-                    rtbResultado.AppendText("Status: Lote ainda está em processamento.\n");
+                    rtbResultado.AppendText("⏳ Status: Lote ainda está em processamento.\n");
                 }
                 else if (resposta.CodigoResposta == 2)
                 {
-                    rtbResultado.AppendText("✓ Status: Lote processado com sucesso! Todos os eventos foram processados.\n");
+                    rtbResultado.AppendText("✅ Status: Lote processado com sucesso! Todos os eventos foram processados.\n");
                 }
                 else if (resposta.CodigoResposta == 3)
                 {
-                    rtbResultado.AppendText("⚠ Status: Lote processado, mas possui um ou mais eventos com ocorrências de erro.\n");
+                    rtbResultado.AppendText("⚠️  Status: Lote processado, mas possui um ou mais eventos com ocorrências de erro.\n");
                 }
                 else if (resposta.CodigoResposta == 4)
                 {
@@ -218,25 +254,115 @@ namespace ExemploAssinadorXML.Forms
                     rtbResultado.AppendText("❓ Status: Resposta inesperada do servidor.\n");
                 }
 
-                if (resposta.Ocorrencias.Count > 0)
+                // Ocorrências gerais do lote
+                if (resposta.Ocorrencias != null && resposta.Ocorrencias.Count > 0)
                 {
-                    rtbResultado.AppendText("\nOcorrências encontradas:\n");
-                    foreach (var ocorrencia in resposta.Ocorrencias)
+                    rtbResultado.AppendText("\n");
+                    rtbResultado.AppendText("═══════════════════════════════════════════════════════════\n");
+                    rtbResultado.AppendText("              OCORRÊNCIAS GERAIS DO LOTE\n");
+                    rtbResultado.AppendText("═══════════════════════════════════════════════════════════\n\n");
+                    
+                    for (int i = 0; i < resposta.Ocorrencias.Count; i++)
                     {
-                        rtbResultado.AppendText($"\n  Código: {ocorrencia.Codigo}\n");
-                        rtbResultado.AppendText($"  Descrição: {ocorrencia.Descricao}\n");
-                        rtbResultado.AppendText($"  Tipo: {ocorrencia.Tipo}\n");
+                        var ocorrencia = resposta.Ocorrencias[i];
+                        rtbResultado.AppendText($"🔴 OCORRÊNCIA {i + 1}:\n");
+                        if (!string.IsNullOrEmpty(ocorrencia.Codigo))
+                        {
+                            rtbResultado.AppendText($"   Código: {ocorrencia.Codigo}\n");
+                        }
+                        if (!string.IsNullOrEmpty(ocorrencia.Descricao))
+                        {
+                            rtbResultado.AppendText($"   Descrição: {ocorrencia.Descricao}\n");
+                        }
+                        if (!string.IsNullOrEmpty(ocorrencia.Tipo))
+                        {
+                            rtbResultado.AppendText($"   Tipo: {ocorrencia.Tipo}\n");
+                        }
+                        rtbResultado.AppendText("\n");
                     }
                 }
 
-                // Exibir XML completo da resposta
-                if (!string.IsNullOrEmpty(resposta.XmlCompleto))
+                // Detalhes de cada evento individual
+                if (resposta.DetalhesEventos != null && resposta.DetalhesEventos.Count > 0)
                 {
-                    rtbResultado.AppendText("\n========================================\n");
-                    rtbResultado.AppendText("XML COMPLETO DA RESPOSTA:\n");
-                    rtbResultado.AppendText("========================================\n");
-                    rtbResultado.AppendText(resposta.XmlCompleto);
+                    rtbResultado.AppendText("\n");
+                    rtbResultado.AppendText("═══════════════════════════════════════════════════════════\n");
+                    rtbResultado.AppendText("                    DETALHES DOS EVENTOS\n");
+                    rtbResultado.AppendText("═══════════════════════════════════════════════════════════\n\n");
+                    
+                    for (int i = 0; i < resposta.DetalhesEventos.Count; i++)
+                    {
+                        var evento = resposta.DetalhesEventos[i];
+                        rtbResultado.AppendText($"📦 EVENTO {i + 1}:\n");
+                        rtbResultado.AppendText($"   ID: {evento.IdEvento ?? "N/A"}\n");
+                        
+                        if (!string.IsNullOrEmpty(evento.TipoEvento))
+                        {
+                            string tipoEventoDesc = ObterDescricaoTipoEvento(evento.TipoEvento);
+                            rtbResultado.AppendText($"   Tipo: {evento.TipoEvento} - {tipoEventoDesc}\n");
+                        }
+                        
+                        if (!string.IsNullOrEmpty(evento.CodigoRetorno))
+                        {
+                            rtbResultado.AppendText($"   Código Retorno: {evento.CodigoRetorno}\n");
+                        }
+                        
+                        if (!string.IsNullOrEmpty(evento.DescricaoRetorno))
+                        {
+                            string statusIcon = evento.DescricaoRetorno.ToUpper().Contains("ERRO") ? "❌" : "✅";
+                            rtbResultado.AppendText($"   Status: {statusIcon} {evento.DescricaoRetorno}\n");
+                        }
+                        
+                        if (evento.DataRecepcao.HasValue)
+                        {
+                            rtbResultado.AppendText($"   Data Recepção: {evento.DataRecepcao.Value:dd/MM/yyyy HH:mm:ss}\n");
+                        }
+                        
+                        if (evento.DataProcessamento.HasValue)
+                        {
+                            rtbResultado.AppendText($"   Data Processamento: {evento.DataProcessamento.Value:dd/MM/yyyy HH:mm:ss}\n");
+                        }
+                        
+                        if (!string.IsNullOrEmpty(evento.Hash))
+                        {
+                            rtbResultado.AppendText($"   Hash: {evento.Hash}\n");
+                        }
+                        
+                        // Ocorrências do evento
+                        if (evento.Ocorrencias != null && evento.Ocorrencias.Count > 0)
+                        {
+                            rtbResultado.AppendText($"\n   ⚠️  ERROS ENCONTRADOS NESTE EVENTO:\n");
+                            for (int j = 0; j < evento.Ocorrencias.Count; j++)
+                            {
+                                var ocorrencia = evento.Ocorrencias[j];
+                                rtbResultado.AppendText($"\n      🔴 Erro {j + 1}:\n");
+                                if (!string.IsNullOrEmpty(ocorrencia.Codigo))
+                                {
+                                    rtbResultado.AppendText($"         Código: {ocorrencia.Codigo}\n");
+                                }
+                                if (!string.IsNullOrEmpty(ocorrencia.Descricao))
+                                {
+                                    rtbResultado.AppendText($"         Descrição: {ocorrencia.Descricao}\n");
+                                }
+                                if (!string.IsNullOrEmpty(ocorrencia.Tipo))
+                                {
+                                    rtbResultado.AppendText($"         Tipo: {ocorrencia.Tipo}\n");
+                                }
+                            }
+                        }
+                        else if (!string.IsNullOrEmpty(evento.DescricaoRetorno) && 
+                                 evento.DescricaoRetorno.ToUpper().Contains("SUCESSO"))
+                        {
+                            rtbResultado.AppendText($"\n   ✅ Nenhum erro encontrado neste evento.\n");
+                        }
+                        
+                        rtbResultado.AppendText("\n");
+                        rtbResultado.AppendText("───────────────────────────────────────────────────────────\n\n");
+                    }
                 }
+
+                // Exibir XML completo apenas se solicitado (opcional - pode ser removido ou colocado em botão separado)
+                // Removido para tornar a exibição mais limpa e focada nas informações importantes
             }
             catch (Exception ex)
             {
@@ -322,23 +448,45 @@ namespace ExemploAssinadorXML.Forms
                 {
                     var lote = lotesCarregados[lstLotes.SelectedIndex];
                     
-                    rtbDetalhes.AppendText($"Tipo: {lote.Tipo}\n");
-                    rtbDetalhes.AppendText($"Protocolo: {(string.IsNullOrEmpty(lote.Protocolo) ? "Não disponível" : lote.Protocolo)}\n");
+                    // Tipo do lote
+                    string tipoStr = lote.Tipo.ToString();
+                    rtbDetalhes.AppendText($"════════════════════════════════════════\n");
+                    rtbDetalhes.AppendText($"TIPO DE LOTE: {tipoStr}\n");
+                    rtbDetalhes.AppendText($"════════════════════════════════════════\n\n");
+                    
+                    // Quantidade de eventos
+                    rtbDetalhes.AppendText($"Quantidade de Eventos: {lote.QuantidadeEventos}\n");
+                    
+                    // Período
+                    string periodoStr = !string.IsNullOrEmpty(lote.Periodo) ? lote.Periodo : "Não informado";
+                    rtbDetalhes.AppendText($"Período: {periodoStr}\n");
+                    
+                    // Protocolo
+                    string protocoloStr = !string.IsNullOrEmpty(lote.Protocolo) ? lote.Protocolo : "Não disponível";
+                    rtbDetalhes.AppendText($"Protocolo: {protocoloStr}\n");
+                    
+                    // Status
                     rtbDetalhes.AppendText($"Status: {lote.Status}\n");
-                    rtbDetalhes.AppendText($"Período: {(string.IsNullOrEmpty(lote.Periodo) ? "Não informado" : lote.Periodo)}\n");
+                    
+                    // Data Processamento
                     rtbDetalhes.AppendText($"Data Processamento: {lote.DataProcessamento:dd/MM/yyyy HH:mm:ss}\n\n");
+                    
+                    // Arquivos
+                    rtbDetalhes.AppendText($"════════════════════════════════════════\n");
+                    rtbDetalhes.AppendText($"ARQUIVOS:\n");
+                    rtbDetalhes.AppendText($"════════════════════════════════════════\n");
                     
                     if (!string.IsNullOrEmpty(lote.ArquivoOriginal))
                     {
-                        rtbDetalhes.AppendText($"Arquivo Original: {Path.GetFileName(lote.ArquivoOriginal)}\n");
+                        rtbDetalhes.AppendText($"Original: {Path.GetFileName(lote.ArquivoOriginal)}\n");
                     }
                     if (!string.IsNullOrEmpty(lote.ArquivoAssinado))
                     {
-                        rtbDetalhes.AppendText($"Arquivo Assinado: {Path.GetFileName(lote.ArquivoAssinado)}\n");
+                        rtbDetalhes.AppendText($"Assinado: {Path.GetFileName(lote.ArquivoAssinado)}\n");
                     }
                     if (!string.IsNullOrEmpty(lote.ArquivoCriptografado))
                     {
-                        rtbDetalhes.AppendText($"Arquivo Criptografado: {Path.GetFileName(lote.ArquivoCriptografado)}\n");
+                        rtbDetalhes.AppendText($"Criptografado: {Path.GetFileName(lote.ArquivoCriptografado)}\n");
                         
                         // Tentar obter informações do arquivo
                         if (File.Exists(lote.ArquivoCriptografado))
@@ -348,15 +496,16 @@ namespace ExemploAssinadorXML.Forms
                         }
                     }
                     
-                    if (!string.IsNullOrEmpty(lote.Protocolo))
-                    {
-                        rtbDetalhes.AppendText($"\n[Clique duas vezes no protocolo acima para consultar]\n");
-                    }
-                    
-                    // Preencher campo de protocolo se houver
+                    // Preencher campo de protocolo automaticamente
                     if (!string.IsNullOrEmpty(lote.Protocolo))
                     {
                         txtProtocolo.Text = lote.Protocolo;
+                        rtbDetalhes.AppendText($"\n[Protocolo preenchido automaticamente - clique em 'Consultar' para verificar status]\n");
+                    }
+                    else
+                    {
+                        txtProtocolo.Text = "";
+                        rtbDetalhes.AppendText($"\n[Este lote ainda não possui protocolo - não foi enviado ou aguardando resposta]\n");
                     }
                 }
                 else
@@ -398,6 +547,23 @@ namespace ExemploAssinadorXML.Forms
 
             var form = new GerarFechamentoForm(ConfigForm);
             form.ShowDialog();
+        }
+
+        private string ObterDescricaoTipoEvento(string tipoEvento)
+        {
+            switch (tipoEvento)
+            {
+                case "001": return "Cadastro de Declarante";
+                case "002": return "Abertura e-Financeira";
+                case "003": return "Cadastro de Intermediário";
+                case "004": return "Cadastro de Patrocinado";
+                case "005": return "Exclusão e-Financeira";
+                case "006": return "Exclusão";
+                case "007": return "Fechamento e-Financeira";
+                case "008": return "Movimentação de Operação Financeira";
+                case "009": return "Movimentação de Previdência Privada";
+                default: return "Tipo desconhecido";
+            }
         }
 
         private X509Certificate2 BuscarCertificado(string thumbprint)

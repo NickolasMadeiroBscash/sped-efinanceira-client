@@ -43,5 +43,6 @@ namespace ExemploAssinadorXML.Models
         public string Erro { get; set; }
         public DateTime DataProcessamento { get; set; }
         public string Periodo { get; set; }
+        public int QuantidadeEventos { get; set; }
     }
 }

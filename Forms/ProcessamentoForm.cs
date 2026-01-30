@@ -41,6 +41,7 @@ namespace ExemploAssinadorXML.Forms
         private bool cancelarProcessamento = false;
 
         public ConfiguracaoForm ConfigForm { get; set; }
+        public ConsultaForm ConsultaForm { get; set; }
 
         public ProcessamentoForm()
         {
@@ -625,6 +626,26 @@ namespace ExemploAssinadorXML.Forms
 
                 if (cancelarProcessamento) return;
 
+                // Registrar lote processado (mesmo sem envio)
+                int quantidadeEventos = ProtocoloPersistenciaService.ContarEventosNoXml(arquivoAssinado);
+                ProtocoloPersistenciaService.RegistrarProtocolo(
+                    TipoLote.Abertura,
+                    arquivoCriptografado,
+                    null, // Protocolo será preenchido após envio
+                    config.Periodo,
+                    quantidadeEventos
+                );
+                AdicionarLog($"Lote registrado na lista de processados ({quantidadeEventos} evento(s)).");
+                
+                // Atualizar lista na aba Consulta
+                if (ConsultaForm != null)
+                {
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        ConsultaForm.AtualizarListaLotes();
+                    });
+                }
+
                 // 4. Enviar (se não estiver marcado "Apenas Processar")
                 if (!chkApenasProcessar.Checked)
                 {
@@ -652,13 +673,26 @@ namespace ExemploAssinadorXML.Forms
                                 AdicionarLog($"{resposta.Protocolo}");
                                 AdicionarLog($"════════════════════════════════════════");
                                 
-                                // Registrar protocolo para consulta
+                                // Atualizar protocolo no lote já registrado
                                 ProtocoloPersistenciaService.RegistrarProtocolo(
                                     TipoLote.Abertura, 
                                     arquivoCriptografado, 
                                     resposta.Protocolo,
-                                    config.Periodo
+                                    config.Periodo,
+                                    quantidadeEventos
                                 );
+                                
+                                // Aguardar um momento para garantir que o protocolo foi salvo
+                                System.Threading.Thread.Sleep(500);
+                                
+                                // Atualizar lista na aba Consulta com o protocolo já preenchido
+                                if (ConsultaForm != null)
+                                {
+                                    this.Invoke((MethodInvoker)delegate
+                                    {
+                                        ConsultaForm.AtualizarListaLotes();
+                                    });
+                                }
                                 
                                 // Exibir MessageBox destacando o protocolo
                                 MessageBox.Show(
@@ -702,6 +736,15 @@ namespace ExemploAssinadorXML.Forms
                 else
                 {
                     AdicionarLog("Envio não realizado (modo 'Apenas Processar' ativo).");
+                    
+                    // Atualizar lista na aba Consulta mesmo sem protocolo
+                    if (ConsultaForm != null)
+                    {
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            ConsultaForm.AtualizarListaLotes();
+                        });
+                    }
                 }
 
                 status.LotesProcessados = 1;
@@ -912,6 +955,17 @@ namespace ExemploAssinadorXML.Forms
 
                         if (cancelarProcessamento) break;
 
+                        // Registrar lote processado (mesmo sem envio)
+                        int quantidadeEventos = pessoasLote.Count;
+                        ProtocoloPersistenciaService.RegistrarProtocolo(
+                            TipoLote.Movimentacao,
+                            arquivoCriptografado,
+                            null, // Protocolo será preenchido após envio
+                            periodoStr,
+                            quantidadeEventos
+                        );
+                        AdicionarLog($"Lote {lotesGerados} registrado na lista de processados ({quantidadeEventos} evento(s)).");
+
                         // Enviar (se não estiver marcado "Apenas Processar")
                         if (!chkApenasProcessar.Checked)
                         {
@@ -939,13 +993,26 @@ namespace ExemploAssinadorXML.Forms
                                         AdicionarLog($"{resposta.Protocolo}");
                                         AdicionarLog($"════════════════════════════════════════");
                                         
-                                        // Registrar protocolo para consulta
+                                        // Atualizar protocolo no lote já registrado
                                         ProtocoloPersistenciaService.RegistrarProtocolo(
                                             TipoLote.Movimentacao, 
                                             arquivoCriptografado, 
                                             resposta.Protocolo,
-                                            periodoStr
+                                            periodoStr,
+                                            quantidadeEventos
                                         );
+                                        
+                                        // Aguardar um momento para garantir que o protocolo foi salvo
+                                        System.Threading.Thread.Sleep(500);
+                                        
+                                        // Atualizar lista na aba Consulta com o protocolo já preenchido
+                                        if (ConsultaForm != null)
+                                        {
+                                            this.Invoke((MethodInvoker)delegate
+                                            {
+                                                ConsultaForm.AtualizarListaLotes();
+                                            });
+                                        }
                                         
                                         // Exibir MessageBox destacando o protocolo
                                         MessageBox.Show(
@@ -989,6 +1056,15 @@ namespace ExemploAssinadorXML.Forms
                         else
                         {
                             AdicionarLog($"Lote {lotesGerados} não enviado (modo 'Apenas Processar' ativo).");
+                            
+                            // Atualizar lista na aba Consulta mesmo sem protocolo
+                            if (ConsultaForm != null)
+                            {
+                                this.Invoke((MethodInvoker)delegate
+                                {
+                                    ConsultaForm.AtualizarListaLotes();
+                                });
+                            }
                         }
 
                         status.LotesProcessados++;
@@ -1087,6 +1163,17 @@ namespace ExemploAssinadorXML.Forms
 
                 if (cancelarProcessamento) return;
 
+                // Registrar lote processado (mesmo sem envio)
+                int quantidadeEventos = ProtocoloPersistenciaService.ContarEventosNoXml(arquivoAssinado);
+                ProtocoloPersistenciaService.RegistrarProtocolo(
+                    TipoLote.Fechamento,
+                    arquivoCriptografado,
+                    null, // Protocolo será preenchido após envio
+                    config.Periodo,
+                    quantidadeEventos
+                );
+                AdicionarLog($"Lote registrado na lista de processados ({quantidadeEventos} evento(s)).");
+
                 // 4. Enviar (se não estiver marcado "Apenas Processar")
                 if (!chkApenasProcessar.Checked)
                 {
@@ -1114,13 +1201,26 @@ namespace ExemploAssinadorXML.Forms
                                 AdicionarLog($"{resposta.Protocolo}");
                                 AdicionarLog($"════════════════════════════════════════");
                                 
-                                // Registrar protocolo para consulta
+                                // Atualizar protocolo no lote já registrado
                                 ProtocoloPersistenciaService.RegistrarProtocolo(
                                     TipoLote.Fechamento, 
                                     arquivoCriptografado, 
                                     resposta.Protocolo,
-                                    config.Periodo
+                                    config.Periodo,
+                                    quantidadeEventos
                                 );
+                                
+                                // Aguardar um momento para garantir que o protocolo foi salvo
+                                System.Threading.Thread.Sleep(500);
+                                
+                                // Atualizar lista na aba Consulta com o protocolo já preenchido
+                                if (ConsultaForm != null)
+                                {
+                                    this.Invoke((MethodInvoker)delegate
+                                    {
+                                        ConsultaForm.AtualizarListaLotes();
+                                    });
+                                }
                                 
                                 // Exibir MessageBox destacando o protocolo
                                 MessageBox.Show(
@@ -1164,6 +1264,15 @@ namespace ExemploAssinadorXML.Forms
                 else
                 {
                     AdicionarLog("Envio não realizado (modo 'Apenas Processar' ativo).");
+                    
+                    // Atualizar lista na aba Consulta mesmo sem protocolo
+                    if (ConsultaForm != null)
+                    {
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            ConsultaForm.AtualizarListaLotes();
+                        });
+                    }
                 }
 
                 status.LotesProcessados = 1;

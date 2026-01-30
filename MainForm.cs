@@ -78,14 +78,6 @@ namespace ExemploAssinadorXML
             tabConfiguracao.Controls.Add(configuracaoForm);
             configuracaoForm.Show();
 
-            processamentoForm = new ProcessamentoForm();
-            processamentoForm.Dock = DockStyle.Fill;
-            processamentoForm.TopLevel = false;
-            processamentoForm.FormBorderStyle = FormBorderStyle.None;
-            processamentoForm.ConfigForm = configuracaoForm;
-            tabProcessamento.Controls.Add(processamentoForm);
-            processamentoForm.Show();
-
             consultaForm = new ConsultaForm();
             consultaForm.Dock = DockStyle.Fill;
             consultaForm.TopLevel = false;
@@ -93,6 +85,18 @@ namespace ExemploAssinadorXML
             consultaForm.ConfigForm = configuracaoForm;
             tabConsulta.Controls.Add(consultaForm);
             consultaForm.Show();
+
+            processamentoForm = new ProcessamentoForm();
+            processamentoForm.Dock = DockStyle.Fill;
+            processamentoForm.TopLevel = false;
+            processamentoForm.FormBorderStyle = FormBorderStyle.None;
+            processamentoForm.ConfigForm = configuracaoForm;
+            processamentoForm.ConsultaForm = consultaForm;
+            tabProcessamento.Controls.Add(processamentoForm);
+            processamentoForm.Show();
+
+            // Atualizar lista quando a aba Consulta for ativada
+            tabConsulta.Enter += (s, e) => consultaForm.AtualizarListaLotes();
 
             this.ResumeLayout(false);
         }
