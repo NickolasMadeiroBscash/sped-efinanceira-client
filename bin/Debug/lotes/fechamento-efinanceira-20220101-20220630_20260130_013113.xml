@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<eFinanceira xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.eFinanceira.gov.br/schemas/envioLoteEventosAssincrono/v1_0_0">
+  <loteEventosAssincrono>
+    <cnpjDeclarante>40994589000105</cnpjDeclarante>
+    <eventos>
+      <evento id="ID0">
+        <eFinanceira xmlns="http://www.eFinanceira.gov.br/schemas/evtFechamentoeFinanceira/v1_3_0">
+          <evtFechamentoeFinanceira id="ID000001769747473423">
+            <ideEvento>
+              <indRetificacao>1</indRetificacao>
+              <tpAmb>2</tpAmb>
+              <aplicEmi>1</aplicEmi>
+              <verAplic>00000000000000000001</verAplic>
+            </ideEvento>
+            <ideDeclarante>
+              <cnpjDeclarante>40994589000105</cnpjDeclarante>
+            </ideDeclarante>
+            <infoFechamento>
+              <dtInicio>2022-01-01</dtInicio>
+              <dtFim>2022-06-30</dtFim>
+              <sitEspecial>0</sitEspecial>
+            </infoFechamento>
+          </evtFechamentoeFinanceira>
+        </eFinanceira>
+      </evento>
+    </eventos>
+  </loteEventosAssincrono>
+</eFinanceira>

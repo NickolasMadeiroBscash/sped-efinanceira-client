@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<ConfiguracaoCompleta xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Config>
+    <CnpjDeclarante>40994589000105</CnpjDeclarante>
+    <CertThumbprint>6A85397E2E7E6AF601418C24736155AF70FE8D02</CertThumbprint>
+    <CertServidorThumbprint>cc242988a739caa7757b29e2a900ae35519cdb39</CertServidorThumbprint>
+    <Ambiente>TEST</Ambiente>
+    <TestEnvioHabilitado>false</TestEnvioHabilitado>
+    <ModoTeste>true</ModoTeste>
+    <Periodo>202201</Periodo>
+    <DiretorioLotes>C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\bin\Debug\lotes</DiretorioLotes>
+    <PageSize>50</PageSize>
+    <EventoOffset>0</EventoOffset>
+    <OffsetRegistros>55</OffsetRegistros>
+    <MaxLotes>1</MaxLotes>
+    <EventosPorLote>1</EventosPorLote>
+    <UrlTeste>https://pre-efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto</UrlTeste>
+    <UrlProducao>https://efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto</UrlProducao>
+    <UrlConsultaTeste>https://pre-efinanceira.receita.fazenda.gov.br/consulta/lotes/</UrlConsultaTeste>
+    <UrlConsultaProducao>https://efinanceira.receita.fazenda.gov.br/consulta/lotes/</UrlConsultaProducao>
+  </Config>
+  <DadosAbertura>
+    <CnpjDeclarante>40994589000105</CnpjDeclarante>
+    <DtInicio>2022-01-01</DtInicio>
+    <DtFim>2022-06-29</DtFim>
+    <TipoAmbiente>2</TipoAmbiente>
+    <AplicacaoEmissora>1</AplicacaoEmissora>
+    <IndRetificacao>1</IndRetificacao>
+    <NrRecibo />
+    <IndicarMovOpFin>true</IndicarMovOpFin>
+    <ResponsavelRMF>
+      <Cnpj>40994589000105</Cnpj>
+      <Cpf>78325121726</Cpf>
+      <Nome>Responsável RMF</Nome>
+      <Setor>Contabilidade</Setor>
+      <TelefoneDDD>85</TelefoneDDD>
+      <TelefoneNumero>30523500</TelefoneNumero>
+      <TelefoneRamal />
+      <EnderecoLogradouro>Avenida Desembargador Moreira</EnderecoLogradouro>
+      <EnderecoNumero>1300</EnderecoNumero>
+      <EnderecoComplemento>Sala 1307 T- Sul</EnderecoComplemento>
+      <EnderecoBairro>Aldeota</EnderecoBairro>
+      <EnderecoCEP>60170002</EnderecoCEP>
+      <EnderecoMunicipio>Fortaleza</EnderecoMunicipio>
+      <EnderecoUF>CE</EnderecoUF>
+    </ResponsavelRMF>
+    <RespeFin>
+      <Cpf>39768628197</Cpf>
+      <Nome>Responsável e-Financeira</Nome>
+      <Setor>Contabilidade</Setor>
+      <TelefoneDDD>85</TelefoneDDD>
+      <TelefoneNumero>30523500</TelefoneNumero>
+      <TelefoneRamal />
+      <EnderecoLogradouro>Avenida Desembargador Moreira</EnderecoLogradouro>
+      <EnderecoNumero>1300</EnderecoNumero>
+      <EnderecoComplemento>Sala 1307 T- Sul</EnderecoComplemento>
+      <EnderecoBairro>Aldeota</EnderecoBairro>
+      <EnderecoCEP>60170002</EnderecoCEP>
+      <EnderecoMunicipio>Fortaleza</EnderecoMunicipio>
+      <EnderecoUF>CE</EnderecoUF>
+      <Email>contabilidade@bscash.com.br</Email>
+    </RespeFin>
+    <RepresLegal>
+      <Cpf>09684527870</Cpf>
+      <Setor>Diretoria</Setor>
+      <TelefoneDDD>11</TelefoneDDD>
+      <TelefoneNumero>29760435</TelefoneNumero>
+      <TelefoneRamal />
+    </RepresLegal>
+  </DadosAbertura>
+  <DadosFechamento>
+    <CnpjDeclarante>40994589000105</CnpjDeclarante>
+    <DtInicio>2022-01-01</DtInicio>
+    <DtFim>2022-06-30</DtFim>
+    <TipoAmbiente>2</TipoAmbiente>
+    <AplicacaoEmissora>1</AplicacaoEmissora>
+    <IndRetificacao>1</IndRetificacao>
+    <NrRecibo />
+    <SitEspecial>0</SitEspecial>
+    <FechamentoPP xsi:nil="true" />
+    <FechamentoMovOpFin>1</FechamentoMovOpFin>
+    <FechamentoMovOpFinAnual xsi:nil="true" />
+    <ContasAReportarEntDecExterior xsi:nil="true" />
+  </DadosFechamento>
+  <DataSalvamento>2026-01-30T01:38:00.7908277-03:00</DataSalvamento>
+</ConfiguracaoCompleta>
