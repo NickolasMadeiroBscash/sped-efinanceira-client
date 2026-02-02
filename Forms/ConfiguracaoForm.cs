@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -13,6 +14,22 @@ namespace ExemploAssinadorXML.Forms
 {
     public partial class ConfiguracaoForm : Form
     {
+        // Constantes para mensagens e tooltips
+        private const string TITULO_VALIDACAO = "Validação";
+        private const string TOOLTIP_TIPO_AMBIENTE = "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes";
+        private const string TOOLTIP_APLICACAO_EMISSORA = "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações";
+        private const string TOOLTIP_IND_RETIFICACAO = "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.";
+        private const string TOOLTIP_NR_RECIBO = "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.";
+        private const string TOOLTIP_COMPLEMENTO_ENDERECO = "Complemento do endereço (apto, sala, bloco, etc.) - opcional.";
+        
+        // Constantes para URLs
+        private const string URL_TESTE = "https://pre-efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto";
+        private const string URL_PRODUCAO = "https://efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto";
+        private const string URL_CONSULTA_TESTE = "https://pre-efinanceira.receita.fazenda.gov.br/consulta/lotes/";
+        private const string URL_CONSULTA_PRODUCAO = "https://efinanceira.receita.fazenda.gov.br/consulta/lotes/";
+        
+        // Constante para formato de data
+        private static readonly System.Globalization.CultureInfo CULTURE_INFO_PT_BR = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
         private GroupBox grpConfigGeral;
         private Label lblCnpjDeclarante;
         private TextBox txtCnpjDeclarante;
@@ -31,6 +48,11 @@ namespace ExemploAssinadorXML.Forms
         private Button btnSelecionarDiretorio;
         private TextBox txtPeriodo;
         private Label lblPeriodo;
+        private ComboBox cmbSemestre;
+        private Label lblSemestre;
+        private NumericUpDown numAno;
+        private Label lblAno;
+        private CheckBox chkCalcularPeriodoAutomatico;
         private Button btnCarregarConfig;
         private Button btnTestarConexao;
 
@@ -47,8 +69,10 @@ namespace ExemploAssinadorXML.Forms
         private TabControl tabConfig;
         private TabPage tabAbertura;
         private TabPage tabFechamento;
+        private TabPage tabCadastroDeclarante;
         private ScrollableControl scrollAbertura;
         private ScrollableControl scrollFechamento;
+        private ScrollableControl scrollCadastroDeclarante;
 
         // Abertura - Básicos
         private TextBox txtDtInicioAbertura;
@@ -58,6 +82,9 @@ namespace ExemploAssinadorXML.Forms
         private ComboBox cmbIndRetificacaoAbertura;
         private TextBox txtNrReciboAbertura;
         private CheckBox chkIndicarMovOpFin;
+        private CheckBox chkCalcularPeriodoAbertura;
+        private ComboBox cmbSemestreAbertura;
+        private NumericUpDown numAnoAbertura;
 
         // ResponsavelRMF
         private TextBox txtRMF_CNPJ;
@@ -110,12 +137,34 @@ namespace ExemploAssinadorXML.Forms
         private CheckBox chkFechamentoPP;
         private CheckBox chkFechamentoMovOpFin;
         private CheckBox chkFechamentoMovOpFinAnual;
+        private CheckBox chkCalcularPeriodoFechamento;
+        private ComboBox cmbSemestreFechamento;
+        private NumericUpDown numAnoFechamento;
+
+        // Cadastro Declarante
+        private ComboBox cmbTipoAmbienteCadastro;
+        private ComboBox cmbAplicacaoEmissoraCadastro;
+        private ComboBox cmbIndRetificacaoCadastro;
+        private TextBox txtNrReciboCadastro;
+        private TextBox txtGIIN;
+        private TextBox txtCategoriaDeclarante;
+        private TextBox txtNomeCadastro;
+        private TextBox txtTpNome;
+        private TextBox txtEnderecoLivreCadastro;
+        private TextBox txtTpEnderecoCadastro;
+        private TextBox txtMunicipioCadastro;
+        private TextBox txtUFCadastro;
+        private TextBox txtCEPCadastro;
+        private TextBox txtPaisCadastro;
+        private TextBox txtPaisResid;
 
         private Button btnSalvarConfig;
-        private ConfiguracaoPersistenciaService persistenciaService;
+        private Button btnLimparDadosTeste;
+        private readonly ConfiguracaoPersistenciaService persistenciaService;
 
         public DadosAbertura DadosAbertura { get; private set; }
         public DadosFechamento DadosFechamento { get; private set; }
+        public DadosCadastroDeclarante DadosCadastroDeclarante { get; private set; }
         public EfinanceiraConfig Config { get; private set; }
 
         public ConfiguracaoForm()
@@ -131,8 +180,8 @@ namespace ExemploAssinadorXML.Forms
         {
             this.SuspendLayout();
             this.Text = "Configuração e-Financeira";
-            this.Size = new Size(1000, 700);
-            this.MinimumSize = new Size(800, 600);
+            this.Size = new Size(1250, 800);
+            this.MinimumSize = new Size(1200, 700);
 
             // ToolTip
             toolTip = new ToolTip();
@@ -144,7 +193,7 @@ namespace ExemploAssinadorXML.Forms
             grpConfigGeral = new GroupBox();
             grpConfigGeral.Text = "Configuração Geral";
             grpConfigGeral.Location = new Point(10, 10);
-            grpConfigGeral.Size = new Size(980, 280);
+            grpConfigGeral.Size = new Size(1230, 400);
             grpConfigGeral.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             int yPos = 25;
@@ -181,12 +230,64 @@ namespace ExemploAssinadorXML.Forms
             toolTip.SetToolTip(btnSelecionarCertServidor, "Abre a lista de certificados para selecionar o certificado público do servidor.");
             yPos += espacamentoVertical;
 
-            // Linha 4: Período
-            lblPeriodo = new Label { Text = "Período (YYYYMM - 01/06=Jan-Jun, 02/12=Jul-Dez):", Location = new Point(10, yPos), Size = new Size(labelWidth, 20) };
-            txtPeriodo = new TextBox { Location = new Point(campoX, yPos - 3), Size = new Size(200, 23) };
+            // Linha 4: Seleção Automática de Semestre
+            chkCalcularPeriodoAutomatico = new CheckBox 
+            { 
+                Text = "Calcular período automaticamente", 
+                Location = new Point(10, yPos), 
+                Size = new Size(250, 20),
+                Checked = true
+            };
+            toolTip.SetToolTip(chkCalcularPeriodoAutomatico, "Quando marcado, calcula automaticamente o período baseado no semestre e ano selecionados.\nO campo de período fica somente leitura.");
+            chkCalcularPeriodoAutomatico.CheckedChanged += (s, e) =>
+            {
+                bool calcularAutomatico = chkCalcularPeriodoAutomatico.Checked;
+                cmbSemestre.Enabled = calcularAutomatico;
+                numAno.Enabled = calcularAutomatico;
+                txtPeriodo.ReadOnly = calcularAutomatico;
+                txtPeriodo.BackColor = calcularAutomatico ? SystemColors.Control : SystemColors.Window;
+                
+                if (calcularAutomatico)
+                {
+                    CalcularPeriodoAutomatico();
+                }
+            };
+            yPos += espacamentoVertical;
+
+            // Linha 5: Semestre e Ano (para cálculo automático)
+            lblSemestre = new Label { Text = "Semestre:", Location = new Point(10, yPos), Size = new Size(100, 20) };
+            cmbSemestre = new ComboBox 
+            { 
+                Location = new Point(115, yPos - 3), 
+                Size = new Size(150, 23), 
+                DropDownStyle = ComboBoxStyle.DropDownList 
+            };
+            cmbSemestre.Items.AddRange(new[] { "1º Semestre (Jan-Jun)", "2º Semestre (Jul-Dez)" });
+            cmbSemestre.SelectedIndex = 0;
+            cmbSemestre.SelectedIndexChanged += (s, e) => { if (chkCalcularPeriodoAutomatico.Checked) CalcularPeriodoAutomatico(); };
+            toolTip.SetToolTip(lblSemestre, "Selecione o semestre para cálculo automático do período.");
+            toolTip.SetToolTip(cmbSemestre, "Selecione o semestre:\n• 1º Semestre = Janeiro a Junho (período YYYY01)\n• 2º Semestre = Julho a Dezembro (período YYYY02)");
+
+            lblAno = new Label { Text = "Ano:", Location = new Point(275, yPos), Size = new Size(50, 20) };
+            numAno = new NumericUpDown 
+            { 
+                Location = new Point(330, yPos - 3), 
+                Size = new Size(80, 23),
+                Minimum = 2000,
+                Maximum = 2100,
+                Value = DateTime.Now.Year
+            };
+            numAno.ValueChanged += (s, e) => { if (chkCalcularPeriodoAutomatico.Checked) CalcularPeriodoAutomatico(); };
+            toolTip.SetToolTip(lblAno, "Ano para cálculo automático do período.");
+            toolTip.SetToolTip(numAno, "Ano para cálculo automático do período (2000-2100).");
+            yPos += espacamentoVertical;
+
+            // Linha 6: Período
+            lblPeriodo = new Label { Text = "Período (YYYYMM - calculado automaticamente):", Location = new Point(10, yPos), Size = new Size(labelWidth, 20) };
+            txtPeriodo = new TextBox { Location = new Point(campoX, yPos - 3), Size = new Size(200, 23), ReadOnly = true, BackColor = SystemColors.Control };
             txtPeriodo.MaxLength = 6;
-            toolTip.SetToolTip(lblPeriodo, "Período semestral no formato YYYYMM:\n• 01 ou 06 = Primeiro semestre (Janeiro a Junho)\n• 02 ou 12 = Segundo semestre (Julho a Dezembro)\nExemplos: 202301 (Jan-Jun/2023) ou 202302 (Jul-Dez/2023)");
-            toolTip.SetToolTip(txtPeriodo, "Período semestral no formato YYYYMM:\n• 01 ou 06 = Primeiro semestre (Janeiro a Junho)\n• 02 ou 12 = Segundo semestre (Julho a Dezembro)\nExemplos: 202301 (Jan-Jun/2023) ou 202302 (Jul-Dez/2023)");
+            toolTip.SetToolTip(lblPeriodo, "Período semestral no formato YYYYMM (calculado automaticamente quando a opção 'Calcular período automaticamente' está marcada):\n• 01 = Primeiro semestre (Janeiro a Junho)\n• 02 = Segundo semestre (Julho a Dezembro)\nExemplos: 202301 (Jan-Jun/2023) ou 202302 (Jul-Dez/2023)");
+            toolTip.SetToolTip(txtPeriodo, "Período semestral no formato YYYYMM.\nEste campo é calculado automaticamente quando a opção 'Calcular período automaticamente' está marcada.");
             txtPeriodo.Leave += (s, e) => 
             {
                 if (!string.IsNullOrWhiteSpace(txtPeriodo.Text) && txtPeriodo.Text.Length == 6)
@@ -201,7 +302,7 @@ namespace ExemploAssinadorXML.Forms
                         if (ano < 2000 || ano > 2100)
                         {
                             MessageBox.Show($"Ano inválido: {ano}. Deve estar entre 2000 e 2100.", 
-                                "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             txtPeriodo.Focus();
                             return;
                         }
@@ -217,7 +318,7 @@ namespace ExemploAssinadorXML.Forms
                                 $"  • 01 ou 06 = Primeiro semestre (Janeiro a Junho)\n" +
                                 $"  • 02 ou 12 = Segundo semestre (Julho a Dezembro)\n\n" +
                                 $"Exemplos: 202301 (Jan-Jun/2023) ou 202302 (Jul-Dez/2023)", 
-                                "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             txtPeriodo.Focus();
                             return;
                         }
@@ -268,41 +369,52 @@ namespace ExemploAssinadorXML.Forms
             btnTestarConexao = new Button { Text = "Testar Conexão BD", Location = new Point(170, yPos), Size = new Size(150, 30) };
             btnTestarConexao.Click += BtnTestarConexao_Click;
 
+            btnSalvarConfig = new Button { Text = "Salvar Configurações", Location = new Point(330, yPos), Size = new Size(150, 30) };
+            btnSalvarConfig.Click += BtnSalvarConfig_Click;
+
+            btnLimparDadosTeste = new Button { Text = "Limpar Dados de Teste", Location = new Point(490, yPos), Size = new Size(150, 30) };
+            btnLimparDadosTeste.Click += BtnLimparDadosTeste_Click;
+            toolTip.SetToolTip(btnLimparDadosTeste, "Limpa os dados de teste no ambiente de Produção Restrita da e-Financeira.\nRequer certificado válido e CNPJ configurado.");
+
             grpConfigGeral.Controls.AddRange(new Control[] {
                 lblCnpjDeclarante, txtCnpjDeclarante,
                 lblCertThumbprint, txtCertThumbprint, btnSelecionarCert,
                 lblCertServidorThumbprint, txtCertServidorThumbprint, btnSelecionarCertServidor,
+                chkCalcularPeriodoAutomatico,
+                lblSemestre, cmbSemestre, lblAno, numAno,
                 lblPeriodo, txtPeriodo,
                 lblDiretorioLotes, txtDiretorioLotes, btnSelecionarDiretorio,
                 lblAmbiente, cmbAmbiente, chkModoTeste, chkHabilitarEnvio,
-                btnCarregarConfig, btnTestarConexao
+                btnCarregarConfig, btnTestarConexao, btnSalvarConfig, btnLimparDadosTeste
             });
+            
+            // Calcular período inicial
+            CalcularPeriodoAutomatico();
 
             // Configurações de Processamento
             CriarGrupoProcessamento();
 
             // TabControl
             tabConfig = new TabControl();
-            tabConfig.Location = new Point(10, 410);
-            tabConfig.Size = new Size(980, 210);
+            tabConfig.Location = new Point(10, 530);
+            tabConfig.Size = new Size(1230, 250);
             tabConfig.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
 
             tabAbertura = new TabPage { Text = "Abertura", UseVisualStyleBackColor = true };
             tabFechamento = new TabPage { Text = "Fechamento", UseVisualStyleBackColor = true };
+            tabCadastroDeclarante = new TabPage { Text = "Cadastro Declarante", UseVisualStyleBackColor = true };
             tabConfig.TabPages.Add(tabAbertura);
             tabConfig.TabPages.Add(tabFechamento);
+            tabConfig.TabPages.Add(tabCadastroDeclarante);
 
             CriarAbaAbertura();
             CriarAbaFechamento();
-
-            // Botão Salvar
-            btnSalvarConfig = new Button { Text = "Salvar Configurações", Location = new Point(10, 630), Size = new Size(150, 35), Anchor = AnchorStyles.Bottom | AnchorStyles.Left };
-            btnSalvarConfig.Click += BtnSalvarConfig_Click;
+            CriarAbaCadastroDeclarante();
 
             // Evento para ajustar valores padrão quando ambiente mudar
             cmbAmbiente.SelectedIndexChanged += CmbAmbiente_SelectedIndexChanged;
 
-            this.Controls.AddRange(new Control[] { grpConfigGeral, grpProcessamento, tabConfig, btnSalvarConfig });
+            this.Controls.AddRange(new Control[] { grpConfigGeral, grpProcessamento, tabConfig });
             this.ResumeLayout(false);
             
             // Aplicar valores padrão após todos os controles serem criados
@@ -316,8 +428,8 @@ namespace ExemploAssinadorXML.Forms
         {
             grpProcessamento = new GroupBox();
             grpProcessamento.Text = "Configurações de Processamento";
-            grpProcessamento.Location = new Point(10, 300);
-            grpProcessamento.Size = new Size(980, 100);
+            grpProcessamento.Location = new Point(10, 420);
+            grpProcessamento.Size = new Size(1230, 100);
             grpProcessamento.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             int xInicio = 10;
@@ -436,73 +548,128 @@ namespace ExemploAssinadorXML.Forms
             int yPos = 10;
 
             // Dados Básicos
-            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(940, 120) };
-            yPos += 130;
+            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(1200, 180) };
+            yPos += 190;
 
-            var lblDtInicio = new Label { Text = "Data Início (AAAA-MM-DD):", Location = new Point(10, 25), Size = new Size(150, 20) };
-            txtDtInicioAbertura = new TextBox { Location = new Point(165, 22), Size = new Size(150, 23) };
+            // Cálculo Automático de Período
+            chkCalcularPeriodoAbertura = new CheckBox 
+            { 
+                Text = "Calcular período automaticamente", 
+                Location = new Point(10, 25), 
+                Size = new Size(250, 20),
+                Checked = true
+            };
+            toolTip.SetToolTip(chkCalcularPeriodoAbertura, "Quando marcado, calcula automaticamente as datas de início e fim baseado no semestre e ano selecionados.\nOs campos de data ficam somente leitura.");
+            chkCalcularPeriodoAbertura.CheckedChanged += (s, e) =>
+            {
+                bool calcularAutomatico = chkCalcularPeriodoAbertura.Checked;
+                cmbSemestreAbertura.Enabled = calcularAutomatico;
+                numAnoAbertura.Enabled = calcularAutomatico;
+                txtDtInicioAbertura.ReadOnly = calcularAutomatico;
+                txtDtFimAbertura.ReadOnly = calcularAutomatico;
+                txtDtInicioAbertura.BackColor = calcularAutomatico ? SystemColors.Control : SystemColors.Window;
+                txtDtFimAbertura.BackColor = calcularAutomatico ? SystemColors.Control : SystemColors.Window;
+                
+                if (calcularAutomatico)
+                {
+                    CalcularPeriodoAbertura();
+                }
+            };
+
+            var lblSemestreAbertura = new Label { Text = "Semestre:", Location = new Point(10, 50), Size = new Size(100, 20) };
+            cmbSemestreAbertura = new ComboBox 
+            { 
+                Location = new Point(115, 47), 
+                Size = new Size(150, 23), 
+                DropDownStyle = ComboBoxStyle.DropDownList 
+            };
+            cmbSemestreAbertura.Items.AddRange(new[] { "1º Semestre (Jan-Jun)", "2º Semestre (Jul-Dez)" });
+            cmbSemestreAbertura.SelectedIndex = 0;
+            cmbSemestreAbertura.SelectedIndexChanged += (s, e) => { if (chkCalcularPeriodoAbertura.Checked) CalcularPeriodoAbertura(); };
+            toolTip.SetToolTip(lblSemestreAbertura, "Selecione o semestre para cálculo automático das datas.");
+            toolTip.SetToolTip(cmbSemestreAbertura, "Selecione o semestre:\n• 1º Semestre = Janeiro a Junho (01/01 a 30/06)\n• 2º Semestre = Julho a Dezembro (01/07 a 31/12)");
+
+            var lblAnoAbertura = new Label { Text = "Ano:", Location = new Point(275, 50), Size = new Size(50, 20) };
+            numAnoAbertura = new NumericUpDown 
+            { 
+                Location = new Point(330, 47), 
+                Size = new Size(80, 23),
+                Minimum = 2000,
+                Maximum = 2100,
+                Value = DateTime.Now.Year
+            };
+            numAnoAbertura.ValueChanged += (s, e) => { if (chkCalcularPeriodoAbertura.Checked) CalcularPeriodoAbertura(); };
+            toolTip.SetToolTip(lblAnoAbertura, "Ano para cálculo automático das datas.");
+            toolTip.SetToolTip(numAnoAbertura, "Ano para cálculo automático das datas (2000-2100).");
+
+            var lblDtInicio = new Label { Text = "Data Início (AAAA-MM-DD):", Location = new Point(10, 80), Size = new Size(150, 20) };
+            txtDtInicioAbertura = new TextBox { Location = new Point(165, 77), Size = new Size(150, 23), ReadOnly = true, BackColor = SystemColors.Control };
             txtDtInicioAbertura.Leave += ValidarData;
-            toolTip.SetToolTip(lblDtInicio, "Data de início do período de abertura no formato AAAA-MM-DD.\nExemplo: 2023-01-01");
-            toolTip.SetToolTip(txtDtInicioAbertura, "Data de início do período de abertura no formato AAAA-MM-DD.\nExemplo: 2023-01-01");
+            toolTip.SetToolTip(lblDtInicio, "Data de início do período de abertura no formato AAAA-MM-DD.\nCalculada automaticamente quando a opção 'Calcular período automaticamente' está marcada.\nExemplo: 2023-01-01 (1º semestre) ou 2023-07-01 (2º semestre)");
+            toolTip.SetToolTip(txtDtInicioAbertura, "Data de início do período de abertura no formato AAAA-MM-DD.\nCalculada automaticamente quando a opção 'Calcular período automaticamente' está marcada.");
 
-            var lblDtFim = new Label { Text = "Data Fim (AAAA-MM-DD):", Location = new Point(330, 25), Size = new Size(150, 20) };
-            txtDtFimAbertura = new TextBox { Location = new Point(485, 22), Size = new Size(150, 23) };
+            var lblDtFim = new Label { Text = "Data Fim (AAAA-MM-DD):", Location = new Point(330, 80), Size = new Size(150, 20) };
+            txtDtFimAbertura = new TextBox { Location = new Point(485, 77), Size = new Size(150, 23), ReadOnly = true, BackColor = SystemColors.Control };
             txtDtFimAbertura.Leave += ValidarData;
-            toolTip.SetToolTip(lblDtFim, "Data de fim do período de abertura no formato AAAA-MM-DD.\nExemplo: 2023-06-30");
-            toolTip.SetToolTip(txtDtFimAbertura, "Data de fim do período de abertura no formato AAAA-MM-DD.\nExemplo: 2023-06-30");
+            toolTip.SetToolTip(lblDtFim, "Data de fim do período de abertura no formato AAAA-MM-DD.\nCalculada automaticamente quando a opção 'Calcular período automaticamente' está marcada.\nExemplo: 2023-06-30 (1º semestre) ou 2023-12-31 (2º semestre)");
+            toolTip.SetToolTip(txtDtFimAbertura, "Data de fim do período de abertura no formato AAAA-MM-DD.\nCalculada automaticamente quando a opção 'Calcular período automaticamente' está marcada.");
 
-            var lblTipoAmbiente = new Label { Text = "Tipo Ambiente:", Location = new Point(10, 55), Size = new Size(100, 20) };
-            cmbTipoAmbienteAbertura = new ComboBox { Location = new Point(115, 52), Size = new Size(150, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblTipoAmbiente = new Label { Text = "Tipo Ambiente:", Location = new Point(650, 80), Size = new Size(100, 20) };
+            cmbTipoAmbienteAbertura = new ComboBox { Location = new Point(755, 77), Size = new Size(150, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbTipoAmbienteAbertura.Items.AddRange(new[] { "1 - Produção", "2 - Homologação" });
             cmbTipoAmbienteAbertura.SelectedIndex = 1;
-            toolTip.SetToolTip(lblTipoAmbiente, "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes");
-            toolTip.SetToolTip(cmbTipoAmbienteAbertura, "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes");
+            toolTip.SetToolTip(lblTipoAmbiente, TOOLTIP_TIPO_AMBIENTE);
+            toolTip.SetToolTip(cmbTipoAmbienteAbertura, TOOLTIP_TIPO_AMBIENTE);
 
-            var lblAplicacaoEmissora = new Label { Text = "Aplicação Emissora:", Location = new Point(280, 55), Size = new Size(120, 20) };
-            cmbAplicacaoEmissoraAbertura = new ComboBox { Location = new Point(405, 52), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblAplicacaoEmissora = new Label { Text = "Aplicação Emissora:", Location = new Point(920, 80), Size = new Size(120, 20) };
+            cmbAplicacaoEmissoraAbertura = new ComboBox { Location = new Point(1045, 77), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbAplicacaoEmissoraAbertura.Items.AddRange(new[] { "1 - Aplicação do contribuinte", "2 - Outros" });
             cmbAplicacaoEmissoraAbertura.SelectedIndex = 0;
-            toolTip.SetToolTip(lblAplicacaoEmissora, "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações");
-            toolTip.SetToolTip(cmbAplicacaoEmissoraAbertura, "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações");
+            toolTip.SetToolTip(lblAplicacaoEmissora, TOOLTIP_APLICACAO_EMISSORA);
+            toolTip.SetToolTip(cmbAplicacaoEmissoraAbertura, TOOLTIP_APLICACAO_EMISSORA);
 
-            var lblIndRetificacao = new Label { Text = "Ind Retificação:", Location = new Point(10, 85), Size = new Size(100, 20) };
-            cmbIndRetificacaoAbertura = new ComboBox { Location = new Point(115, 82), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblIndRetificacao = new Label { Text = "Ind Retificação:", Location = new Point(650, 110), Size = new Size(100, 20) };
+            cmbIndRetificacaoAbertura = new ComboBox { Location = new Point(755, 107), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbIndRetificacaoAbertura.Items.AddRange(new[] { "1 - Original", "2 - Retificação espontânea", "3 - Retificação a pedido" });
             cmbIndRetificacaoAbertura.SelectedIndex = 0;
             cmbIndRetificacaoAbertura.SelectedIndexChanged += CmbIndRetificacaoAbertura_SelectedIndexChanged;
-            toolTip.SetToolTip(lblIndRetificacao, "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.");
-            toolTip.SetToolTip(cmbIndRetificacaoAbertura, "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.");
+            toolTip.SetToolTip(lblIndRetificacao, TOOLTIP_IND_RETIFICACAO);
+            toolTip.SetToolTip(cmbIndRetificacaoAbertura, TOOLTIP_IND_RETIFICACAO);
 
-            var lblNrRecibo = new Label { Text = "Nº Recibo:", Location = new Point(330, 85), Size = new Size(80, 20) };
-            txtNrReciboAbertura = new TextBox { Location = new Point(415, 82), Size = new Size(150, 23), Enabled = false };
-            toolTip.SetToolTip(lblNrRecibo, "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.");
-            toolTip.SetToolTip(txtNrReciboAbertura, "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.");
+            var lblNrRecibo = new Label { Text = "Nº Recibo:", Location = new Point(970, 110), Size = new Size(80, 20) };
+            txtNrReciboAbertura = new TextBox { Location = new Point(1055, 107), Size = new Size(150, 23), Enabled = false };
+            toolTip.SetToolTip(lblNrRecibo, TOOLTIP_NR_RECIBO);
+            toolTip.SetToolTip(txtNrReciboAbertura, TOOLTIP_NR_RECIBO);
 
-            chkIndicarMovOpFin = new CheckBox { Text = "Indicar MovOpFin", Location = new Point(580, 25), Size = new Size(150, 20) };
+            chkIndicarMovOpFin = new CheckBox { Text = "Indicar MovOpFin", Location = new Point(650, 140), Size = new Size(200, 20) };
             toolTip.SetToolTip(chkIndicarMovOpFin, "Marque esta opção se a empresa possui movimentações de operações financeiras a declarar.\nSe marcado, indica que haverá eventos de movimentação financeira.");
 
             grpBasicos.Controls.AddRange(new Control[] {
+                chkCalcularPeriodoAbertura,
+                lblSemestreAbertura, cmbSemestreAbertura, lblAnoAbertura, numAnoAbertura,
                 lblDtInicio, txtDtInicioAbertura, lblDtFim, txtDtFimAbertura,
                 lblTipoAmbiente, cmbTipoAmbienteAbertura, lblAplicacaoEmissora, cmbAplicacaoEmissoraAbertura,
                 lblIndRetificacao, cmbIndRetificacaoAbertura, lblNrRecibo, txtNrReciboAbertura,
                 chkIndicarMovOpFin
             });
+            
+            // Calcular período inicial
+            CalcularPeriodoAbertura();
 
             // ResponsavelRMF
-            var grpRMF = new GroupBox { Text = "Responsável RMF", Location = new Point(10, yPos), Size = new Size(940, 200) };
+            var grpRMF = new GroupBox { Text = "Responsável RMF", Location = new Point(10, yPos), Size = new Size(1200, 200) };
             yPos += 210;
 
             CriarCamposResponsavelRMF(grpRMF, 10);
 
             // RespeFin
-            var grpRespeFin = new GroupBox { Text = "Responsável e-Financeira", Location = new Point(10, yPos), Size = new Size(940, 220) };
+            var grpRespeFin = new GroupBox { Text = "Responsável e-Financeira", Location = new Point(10, yPos), Size = new Size(1200, 220) };
             yPos += 230;
 
             CriarCamposRespeFin(grpRespeFin, 10);
 
             // RepresLegal
-            var grpRepresLegal = new GroupBox { Text = "Representante Legal", Location = new Point(10, yPos), Size = new Size(940, 100) };
-            yPos += 110;
+            var grpRepresLegal = new GroupBox { Text = "Representante Legal", Location = new Point(10, yPos), Size = new Size(1200, 140) };
 
             CriarCamposRepresLegal(grpRepresLegal, 10);
 
@@ -566,8 +733,8 @@ namespace ExemploAssinadorXML.Forms
 
             var lblComplemento = new Label { Text = "Complemento:", Location = new Point(x + 560, y), Size = new Size(90, 20) };
             txtRMF_Complemento = new TextBox { Location = new Point(x + 655, y - 3), Size = new Size(200, 23) };
-            toolTip.SetToolTip(lblComplemento, "Complemento do endereço (apto, sala, bloco, etc.) - opcional.");
-            toolTip.SetToolTip(txtRMF_Complemento, "Complemento do endereço (apto, sala, bloco, etc.) - opcional.");
+            toolTip.SetToolTip(lblComplemento, TOOLTIP_COMPLEMENTO_ENDERECO);
+            toolTip.SetToolTip(txtRMF_Complemento, TOOLTIP_COMPLEMENTO_ENDERECO);
 
             y += 35;
             var lblBairro = new Label { Text = "Bairro:", Location = new Point(x, y), Size = new Size(80, 20) };
@@ -656,8 +823,8 @@ namespace ExemploAssinadorXML.Forms
 
             var lblComplemento = new Label { Text = "Complemento:", Location = new Point(x + 560, y), Size = new Size(90, 20) };
             txtRespeFin_Complemento = new TextBox { Location = new Point(x + 655, y - 3), Size = new Size(200, 23) };
-            toolTip.SetToolTip(lblComplemento, "Complemento do endereço (apto, sala, bloco, etc.) - opcional.");
-            toolTip.SetToolTip(txtRespeFin_Complemento, "Complemento do endereço (apto, sala, bloco, etc.) - opcional.");
+            toolTip.SetToolTip(lblComplemento, TOOLTIP_COMPLEMENTO_ENDERECO);
+            toolTip.SetToolTip(txtRespeFin_Complemento, TOOLTIP_COMPLEMENTO_ENDERECO);
 
             y += 35;
             var lblBairro = new Label { Text = "Bairro:", Location = new Point(x, y), Size = new Size(80, 20) };
@@ -706,18 +873,19 @@ namespace ExemploAssinadorXML.Forms
             toolTip.SetToolTip(lblSetor, "Setor/departamento do representante legal na empresa.");
             toolTip.SetToolTip(txtRepresLegal_Setor, "Setor/departamento do representante legal na empresa.");
 
-            var lblDDD = new Label { Text = "DDD:", Location = new Point(x + 550, y), Size = new Size(50, 20) };
-            txtRepresLegal_DDD = new TextBox { Location = new Point(x + 605, y - 3), Size = new Size(50, 23) };
+            y += 35;
+            var lblDDD = new Label { Text = "DDD:", Location = new Point(x, y), Size = new Size(50, 20) };
+            txtRepresLegal_DDD = new TextBox { Location = new Point(x + 55, y - 3), Size = new Size(50, 23) };
             toolTip.SetToolTip(lblDDD, "DDD do telefone do representante legal (apenas números).\nExemplo: 11");
             toolTip.SetToolTip(txtRepresLegal_DDD, "DDD do telefone do representante legal (apenas números).\nExemplo: 11");
 
-            var lblTelefone = new Label { Text = "Telefone:", Location = new Point(x + 670, y), Size = new Size(70, 20) };
-            txtRepresLegal_Telefone = new TextBox { Location = new Point(x + 745, y - 3), Size = new Size(100, 23) };
+            var lblTelefone = new Label { Text = "Telefone:", Location = new Point(x + 120, y), Size = new Size(70, 20) };
+            txtRepresLegal_Telefone = new TextBox { Location = new Point(x + 195, y - 3), Size = new Size(100, 23) };
             toolTip.SetToolTip(lblTelefone, "Número do telefone do representante legal (apenas números).\nExemplo: 987654321");
             toolTip.SetToolTip(txtRepresLegal_Telefone, "Número do telefone do representante legal (apenas números).\nExemplo: 987654321");
 
-            var lblRamal = new Label { Text = "Ramal:", Location = new Point(x + 860, y), Size = new Size(60, 20) };
-            txtRepresLegal_Ramal = new TextBox { Location = new Point(x + 925, y - 3), Size = new Size(80, 23) };
+            var lblRamal = new Label { Text = "Ramal:", Location = new Point(x + 310, y), Size = new Size(60, 20) };
+            txtRepresLegal_Ramal = new TextBox { Location = new Point(x + 375, y - 3), Size = new Size(80, 23) };
             toolTip.SetToolTip(lblRamal, "Ramal do telefone do representante legal (opcional).");
             toolTip.SetToolTip(txtRepresLegal_Ramal, "Ramal do telefone do representante legal (opcional).");
 
@@ -732,65 +900,115 @@ namespace ExemploAssinadorXML.Forms
             scrollFechamento = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
             int yPos = 10;
 
-            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(940, 250) };
-            yPos += 260;
+            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(1200, 360) };
 
-            var lblDtInicio = new Label { Text = "Data Início (AAAA-MM-DD):", Location = new Point(10, 25), Size = new Size(150, 20) };
-            txtDtInicioFechamento = new TextBox { Location = new Point(165, 22), Size = new Size(150, 23) };
+            // Cálculo Automático de Período
+            chkCalcularPeriodoFechamento = new CheckBox 
+            { 
+                Text = "Calcular período automaticamente", 
+                Location = new Point(10, 25), 
+                Size = new Size(250, 20),
+                Checked = true
+            };
+            toolTip.SetToolTip(chkCalcularPeriodoFechamento, "Quando marcado, calcula automaticamente as datas de início e fim baseado no semestre e ano selecionados.\nOs campos de data ficam somente leitura.");
+            chkCalcularPeriodoFechamento.CheckedChanged += (s, e) =>
+            {
+                bool calcularAutomatico = chkCalcularPeriodoFechamento.Checked;
+                cmbSemestreFechamento.Enabled = calcularAutomatico;
+                numAnoFechamento.Enabled = calcularAutomatico;
+                txtDtInicioFechamento.ReadOnly = calcularAutomatico;
+                txtDtFimFechamento.ReadOnly = calcularAutomatico;
+                txtDtInicioFechamento.BackColor = calcularAutomatico ? SystemColors.Control : SystemColors.Window;
+                txtDtFimFechamento.BackColor = calcularAutomatico ? SystemColors.Control : SystemColors.Window;
+                
+                if (calcularAutomatico)
+                {
+                    CalcularPeriodoFechamento();
+                }
+            };
+
+            var lblSemestreFechamento = new Label { Text = "Semestre:", Location = new Point(10, 50), Size = new Size(100, 20) };
+            cmbSemestreFechamento = new ComboBox 
+            { 
+                Location = new Point(115, 47), 
+                Size = new Size(150, 23), 
+                DropDownStyle = ComboBoxStyle.DropDownList 
+            };
+            cmbSemestreFechamento.Items.AddRange(new[] { "1º Semestre (Jan-Jun)", "2º Semestre (Jul-Dez)" });
+            cmbSemestreFechamento.SelectedIndex = 0;
+            cmbSemestreFechamento.SelectedIndexChanged += (s, e) => { if (chkCalcularPeriodoFechamento.Checked) CalcularPeriodoFechamento(); };
+            toolTip.SetToolTip(lblSemestreFechamento, "Selecione o semestre para cálculo automático das datas.");
+            toolTip.SetToolTip(cmbSemestreFechamento, "Selecione o semestre:\n• 1º Semestre = Janeiro a Junho (01/01 a 30/06)\n• 2º Semestre = Julho a Dezembro (01/07 a 31/12)");
+
+            var lblAnoFechamento = new Label { Text = "Ano:", Location = new Point(275, 50), Size = new Size(50, 20) };
+            numAnoFechamento = new NumericUpDown 
+            { 
+                Location = new Point(330, 47), 
+                Size = new Size(80, 23),
+                Minimum = 2000,
+                Maximum = 2100,
+                Value = DateTime.Now.Year
+            };
+            numAnoFechamento.ValueChanged += (s, e) => { if (chkCalcularPeriodoFechamento.Checked) CalcularPeriodoFechamento(); };
+            toolTip.SetToolTip(lblAnoFechamento, "Ano para cálculo automático das datas.");
+            toolTip.SetToolTip(numAnoFechamento, "Ano para cálculo automático das datas (2000-2100).");
+
+            var lblDtInicio = new Label { Text = "Data Início (AAAA-MM-DD):", Location = new Point(10, 80), Size = new Size(150, 20) };
+            txtDtInicioFechamento = new TextBox { Location = new Point(165, 77), Size = new Size(150, 23), ReadOnly = true, BackColor = SystemColors.Control };
             txtDtInicioFechamento.Leave += ValidarData;
-            toolTip.SetToolTip(lblDtInicio, "Data de início do período de fechamento no formato AAAA-MM-DD.\nExemplo: 2023-01-01");
-            toolTip.SetToolTip(txtDtInicioFechamento, "Data de início do período de fechamento no formato AAAA-MM-DD.\nExemplo: 2023-01-01");
+            toolTip.SetToolTip(lblDtInicio, "Data de início do período de fechamento no formato AAAA-MM-DD.\nCalculada automaticamente quando a opção 'Calcular período automaticamente' está marcada.\nExemplo: 2023-01-01 (1º semestre) ou 2023-07-01 (2º semestre)");
+            toolTip.SetToolTip(txtDtInicioFechamento, "Data de início do período de fechamento no formato AAAA-MM-DD.\nCalculada automaticamente quando a opção 'Calcular período automaticamente' está marcada.");
 
-            var lblDtFim = new Label { Text = "Data Fim (AAAA-MM-DD):", Location = new Point(330, 25), Size = new Size(150, 20) };
-            txtDtFimFechamento = new TextBox { Location = new Point(485, 22), Size = new Size(150, 23) };
+            var lblDtFim = new Label { Text = "Data Fim (AAAA-MM-DD):", Location = new Point(330, 80), Size = new Size(150, 20) };
+            txtDtFimFechamento = new TextBox { Location = new Point(485, 77), Size = new Size(150, 23), ReadOnly = true, BackColor = SystemColors.Control };
             txtDtFimFechamento.Leave += ValidarData;
-            toolTip.SetToolTip(lblDtFim, "Data de fim do período de fechamento no formato AAAA-MM-DD.\nExemplo: 2023-06-30");
-            toolTip.SetToolTip(txtDtFimFechamento, "Data de fim do período de fechamento no formato AAAA-MM-DD.\nExemplo: 2023-06-30");
+            toolTip.SetToolTip(lblDtFim, "Data de fim do período de fechamento no formato AAAA-MM-DD.\nCalculada automaticamente quando a opção 'Calcular período automaticamente' está marcada.\nExemplo: 2023-06-30 (1º semestre) ou 2023-12-31 (2º semestre)");
+            toolTip.SetToolTip(txtDtFimFechamento, "Data de fim do período de fechamento no formato AAAA-MM-DD.\nCalculada automaticamente quando a opção 'Calcular período automaticamente' está marcada.");
 
-            var lblTipoAmbiente = new Label { Text = "Tipo Ambiente:", Location = new Point(10, 55), Size = new Size(100, 20) };
-            cmbTipoAmbienteFechamento = new ComboBox { Location = new Point(115, 52), Size = new Size(150, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblTipoAmbiente = new Label { Text = "Tipo Ambiente:", Location = new Point(650, 80), Size = new Size(100, 20) };
+            cmbTipoAmbienteFechamento = new ComboBox { Location = new Point(755, 77), Size = new Size(150, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbTipoAmbienteFechamento.Items.AddRange(new[] { "1 - Produção", "2 - Homologação" });
             cmbTipoAmbienteFechamento.SelectedIndex = 1;
-            toolTip.SetToolTip(lblTipoAmbiente, "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes");
-            toolTip.SetToolTip(cmbTipoAmbienteFechamento, "Tipo de ambiente:\n• 1 - Produção: Ambiente oficial da Receita Federal\n• 2 - Homologação: Ambiente de testes");
+            toolTip.SetToolTip(lblTipoAmbiente, TOOLTIP_TIPO_AMBIENTE);
+            toolTip.SetToolTip(cmbTipoAmbienteFechamento, TOOLTIP_TIPO_AMBIENTE);
 
-            var lblAplicacaoEmissora = new Label { Text = "Aplicação Emissora:", Location = new Point(280, 55), Size = new Size(120, 20) };
-            cmbAplicacaoEmissoraFechamento = new ComboBox { Location = new Point(405, 52), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblAplicacaoEmissora = new Label { Text = "Aplicação Emissora:", Location = new Point(920, 80), Size = new Size(120, 20) };
+            cmbAplicacaoEmissoraFechamento = new ComboBox { Location = new Point(1045, 77), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbAplicacaoEmissoraFechamento.Items.AddRange(new[] { "1 - Aplicação do contribuinte", "2 - Outros" });
             cmbAplicacaoEmissoraFechamento.SelectedIndex = 0;
-            toolTip.SetToolTip(lblAplicacaoEmissora, "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações");
-            toolTip.SetToolTip(cmbAplicacaoEmissoraFechamento, "Aplicação que está gerando o evento:\n• 1 - Aplicação do contribuinte: Sistema próprio da empresa\n• 2 - Outros: Outras aplicações");
+            toolTip.SetToolTip(lblAplicacaoEmissora, TOOLTIP_APLICACAO_EMISSORA);
+            toolTip.SetToolTip(cmbAplicacaoEmissoraFechamento, TOOLTIP_APLICACAO_EMISSORA);
 
-            var lblIndRetificacao = new Label { Text = "Ind Retificação:", Location = new Point(10, 85), Size = new Size(100, 20) };
-            cmbIndRetificacaoFechamento = new ComboBox { Location = new Point(115, 82), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblIndRetificacao = new Label { Text = "Ind Retificação:", Location = new Point(650, 110), Size = new Size(100, 20) };
+            cmbIndRetificacaoFechamento = new ComboBox { Location = new Point(755, 107), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbIndRetificacaoFechamento.Items.AddRange(new[] { "1 - Original", "2 - Retificação espontânea", "3 - Retificação a pedido" });
             cmbIndRetificacaoFechamento.SelectedIndex = 0;
             cmbIndRetificacaoFechamento.SelectedIndexChanged += CmbIndRetificacaoFechamento_SelectedIndexChanged;
-            toolTip.SetToolTip(lblIndRetificacao, "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.");
-            toolTip.SetToolTip(cmbIndRetificacaoFechamento, "Indicador de retificação:\n• 1 - Original: Declaração original\n• 2 - Retificação espontânea: Correção feita pela empresa\n• 3 - Retificação a pedido: Correção solicitada pela Receita\n\nSe selecionar 2 ou 3, preencha o Nº Recibo.");
+            toolTip.SetToolTip(lblIndRetificacao, TOOLTIP_IND_RETIFICACAO);
+            toolTip.SetToolTip(cmbIndRetificacaoFechamento, TOOLTIP_IND_RETIFICACAO);
 
-            var lblNrRecibo = new Label { Text = "Nº Recibo:", Location = new Point(330, 85), Size = new Size(80, 20) };
-            txtNrReciboFechamento = new TextBox { Location = new Point(415, 82), Size = new Size(150, 23), Enabled = false };
-            toolTip.SetToolTip(lblNrRecibo, "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.");
-            toolTip.SetToolTip(txtNrReciboFechamento, "Número do recibo da declaração original que está sendo retificada.\nObrigatório apenas quando 'Ind Retificação' for 2 ou 3.");
+            var lblNrRecibo = new Label { Text = "Nº Recibo:", Location = new Point(970, 110), Size = new Size(80, 20) };
+            txtNrReciboFechamento = new TextBox { Location = new Point(1055, 107), Size = new Size(150, 23), Enabled = false };
+            toolTip.SetToolTip(lblNrRecibo, TOOLTIP_NR_RECIBO);
+            toolTip.SetToolTip(txtNrReciboFechamento, TOOLTIP_NR_RECIBO);
 
-            var lblSitEspecial = new Label { Text = "Situação Especial:", Location = new Point(10, 115), Size = new Size(120, 20) };
-            cmbSitEspecial = new ComboBox { Location = new Point(135, 112), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            var lblSitEspecial = new Label { Text = "Situação Especial:", Location = new Point(650, 140), Size = new Size(120, 20) };
+            cmbSitEspecial = new ComboBox { Location = new Point(775, 137), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
             cmbSitEspecial.Items.AddRange(new[] { "0 - Não se aplica", "1 - Extinção", "2 - Fusão", "3 - Incorporação", "5 - Cisão" });
             cmbSitEspecial.SelectedIndex = 0;
             toolTip.SetToolTip(lblSitEspecial, "Situação especial da empresa:\n• 0 - Não se aplica: Situação normal\n• 1 - Extinção: Empresa extinta\n• 2 - Fusão: Empresa fundida\n• 3 - Incorporação: Empresa incorporada\n• 5 - Cisão: Empresa cindida");
             toolTip.SetToolTip(cmbSitEspecial, "Situação especial da empresa:\n• 0 - Não se aplica: Situação normal\n• 1 - Extinção: Empresa extinta\n• 2 - Fusão: Empresa fundida\n• 3 - Incorporação: Empresa incorporada\n• 5 - Cisão: Empresa cindida");
 
-            chkNadaADeclarar = new CheckBox { Text = "Nada a Declarar", Location = new Point(350, 115), Size = new Size(150, 20) };
+            chkNadaADeclarar = new CheckBox { Text = "Nada a Declarar", Location = new Point(990, 140), Size = new Size(150, 20) };
             toolTip.SetToolTip(chkNadaADeclarar, "Marque esta opção se não houver nada a declarar no período.\nSe marcado, não é necessário preencher os campos de fechamento.");
 
             // FechamentoPP - Toggle
-            var lblFechamentoPP = new Label { Text = "FechamentoPP:", Location = new Point(10, 145), Size = new Size(120, 20) };
+            var lblFechamentoPP = new Label { Text = "FechamentoPP:", Location = new Point(10, 200), Size = new Size(120, 20) };
             chkFechamentoPP = new CheckBox 
             { 
                 Text = "Com movimento de Previdência Privada", 
-                Location = new Point(135, 142), 
-                Size = new Size(250, 23),
+                Location = new Point(135, 197), 
+                Size = new Size(280, 23),
                 Appearance = Appearance.Button,
                 FlatStyle = FlatStyle.Flat
             };
@@ -808,11 +1026,11 @@ namespace ExemploAssinadorXML.Forms
             toolTip.SetToolTip(lblFechamentoPP, "Indica se há movimento de Previdência Privada no período.\nMarque = Com movimento | Desmarque = Sem movimento");
 
             // FechamentoMovOpFin - Toggle
-            var lblFechamentoMovOpFin = new Label { Text = "FechamentoMovOpFin:", Location = new Point(400, 145), Size = new Size(150, 20) };
+            var lblFechamentoMovOpFin = new Label { Text = "FechamentoMovOpFin:", Location = new Point(430, 200), Size = new Size(180, 20) };
             chkFechamentoMovOpFin = new CheckBox 
             { 
                 Text = "Com movimento de Operação Financeira", 
-                Location = new Point(555, 142), 
+                Location = new Point(615, 197), 
                 Size = new Size(280, 23),
                 Appearance = Appearance.Button,
                 FlatStyle = FlatStyle.Flat
@@ -831,11 +1049,11 @@ namespace ExemploAssinadorXML.Forms
             toolTip.SetToolTip(lblFechamentoMovOpFin, "Indica se há movimento de Operação Financeira no período.\nMarque = Com movimento | Desmarque = Sem movimento");
 
             // FechamentoMovOpFinAnual - Toggle
-            var lblFechamentoMovOpFinAnual = new Label { Text = "FechamentoMovOpFinAnual:", Location = new Point(10, 175), Size = new Size(180, 20) };
+            var lblFechamentoMovOpFinAnual = new Label { Text = "FechamentoMovOpFinAnual:", Location = new Point(910, 200), Size = new Size(200, 20) };
             chkFechamentoMovOpFinAnual = new CheckBox 
             { 
                 Text = "Com movimento de Operação Financeira Anual", 
-                Location = new Point(195, 172), 
+                Location = new Point(1115, 197), 
                 Size = new Size(320, 23),
                 Appearance = Appearance.Button,
                 FlatStyle = FlatStyle.Flat
@@ -859,13 +1077,15 @@ namespace ExemploAssinadorXML.Forms
                 Text = "ℹ️ IMPORTANTE: Se 'Nada a Declarar' NÃO estiver marcado, você DEVE marcar pelo menos um dos campos de fechamento acima.\n" +
                        "Use os toggles acima para indicar se há movimento de Previdência Privada, Operação Financeira ou Operação Financeira Anual.\n" +
                        "Exemplo: Se você enviou movimentações financeiras, marque 'FechamentoMovOpFin'.",
-                Location = new Point(10, 205), 
-                Size = new Size(920, 50),
+                Location = new Point(10, 240), 
+                Size = new Size(1180, 50),
                 ForeColor = Color.DarkBlue,
                 Font = new Font("Microsoft Sans Serif", 8.5f, FontStyle.Regular)
             };
 
             grpBasicos.Controls.AddRange(new Control[] {
+                chkCalcularPeriodoFechamento,
+                lblSemestreFechamento, cmbSemestreFechamento, lblAnoFechamento, numAnoFechamento,
                 lblDtInicio, txtDtInicioFechamento, lblDtFim, txtDtFimFechamento,
                 lblTipoAmbiente, cmbTipoAmbienteFechamento, lblAplicacaoEmissora, cmbAplicacaoEmissoraFechamento,
                 lblIndRetificacao, cmbIndRetificacaoFechamento, lblNrRecibo, txtNrReciboFechamento,
@@ -874,9 +1094,132 @@ namespace ExemploAssinadorXML.Forms
                 lblFechamentoMovOpFinAnual, chkFechamentoMovOpFinAnual,
                 lblLegenda
             });
+            
+            // Calcular período inicial
+            CalcularPeriodoFechamento();
 
             scrollFechamento.Controls.Add(grpBasicos);
             tabFechamento.Controls.Add(scrollFechamento);
+        }
+
+        private void CriarAbaCadastroDeclarante()
+        {
+            scrollCadastroDeclarante = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+            int yPos = 10;
+
+            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(1200, 400) };
+
+            // Campos básicos do ideEvento
+            var lblTipoAmbiente = new Label { Text = "Tipo Ambiente:", Location = new Point(10, 25), Size = new Size(100, 20) };
+            cmbTipoAmbienteCadastro = new ComboBox { Location = new Point(115, 22), Size = new Size(150, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            cmbTipoAmbienteCadastro.Items.AddRange(new[] { "1 - Produção", "2 - Homologação" });
+            cmbTipoAmbienteCadastro.SelectedIndex = 1;
+            toolTip.SetToolTip(lblTipoAmbiente, TOOLTIP_TIPO_AMBIENTE);
+            toolTip.SetToolTip(cmbTipoAmbienteCadastro, TOOLTIP_TIPO_AMBIENTE);
+
+            var lblAplicacaoEmissora = new Label { Text = "Aplicação Emissora:", Location = new Point(280, 25), Size = new Size(120, 20) };
+            cmbAplicacaoEmissoraCadastro = new ComboBox { Location = new Point(405, 22), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            cmbAplicacaoEmissoraCadastro.Items.AddRange(new[] { "1 - Aplicação do contribuinte", "2 - Outros" });
+            cmbAplicacaoEmissoraCadastro.SelectedIndex = 0;
+            toolTip.SetToolTip(lblAplicacaoEmissora, TOOLTIP_APLICACAO_EMISSORA);
+            toolTip.SetToolTip(cmbAplicacaoEmissoraCadastro, TOOLTIP_APLICACAO_EMISSORA);
+
+            var lblIndRetificacao = new Label { Text = "Ind Retificação:", Location = new Point(620, 25), Size = new Size(100, 20) };
+            cmbIndRetificacaoCadastro = new ComboBox { Location = new Point(725, 22), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            cmbIndRetificacaoCadastro.Items.AddRange(new[] { "1 - Original", "2 - Retificação espontânea", "3 - Retificação a pedido" });
+            cmbIndRetificacaoCadastro.SelectedIndex = 0;
+            cmbIndRetificacaoCadastro.SelectedIndexChanged += CmbIndRetificacaoCadastro_SelectedIndexChanged;
+            toolTip.SetToolTip(lblIndRetificacao, TOOLTIP_IND_RETIFICACAO);
+            toolTip.SetToolTip(cmbIndRetificacaoCadastro, TOOLTIP_IND_RETIFICACAO);
+
+            var lblNrRecibo = new Label { Text = "Nº Recibo:", Location = new Point(940, 25), Size = new Size(80, 20) };
+            txtNrReciboCadastro = new TextBox { Location = new Point(1025, 22), Size = new Size(150, 23), Enabled = false };
+            toolTip.SetToolTip(lblNrRecibo, TOOLTIP_NR_RECIBO);
+            toolTip.SetToolTip(txtNrReciboCadastro, TOOLTIP_NR_RECIBO);
+
+            // Campos do infoCadastro
+            yPos = 60;
+            var lblGIIN = new Label { Text = "GIIN:", Location = new Point(10, yPos), Size = new Size(80, 20) };
+            txtGIIN = new TextBox { Location = new Point(95, yPos - 3), Size = new Size(200, 23) };
+            toolTip.SetToolTip(lblGIIN, "GIIN (Global Intermediary Identification Number) da Entidade Declarante.\nFormato: 6 caracteres alfanuméricos + '.' + 5 caracteres + '.' + 2 caracteres + '.' + 3 caracteres numéricos");
+            toolTip.SetToolTip(txtGIIN, "GIIN da Entidade Declarante (opcional).");
+
+            var lblCategoriaDeclarante = new Label { Text = "Categoria Declarante:", Location = new Point(310, yPos), Size = new Size(130, 20) };
+            txtCategoriaDeclarante = new TextBox { Location = new Point(445, yPos - 3), Size = new Size(150, 23) };
+            toolTip.SetToolTip(lblCategoriaDeclarante, "Código da categoria de declarante conforme tabela vigente.\nExemplo: FATCA602 para Instituições Financeiras Brasileiras Informantes.");
+            toolTip.SetToolTip(txtCategoriaDeclarante, "Código da categoria de declarante (opcional).");
+
+            yPos += 35;
+            var lblNome = new Label { Text = "Nome (Razão Social):", Location = new Point(10, yPos), Size = new Size(130, 20) };
+            txtNomeCadastro = new TextBox { Location = new Point(145, yPos - 3), Size = new Size(400, 23) };
+            toolTip.SetToolTip(lblNome, "Razão social da Entidade Declarante, nome empresarial ou denominação.\nDeve ser idêntico ao que consta no Cadastro CNPJ.");
+            toolTip.SetToolTip(txtNomeCadastro, "Razão social da Entidade Declarante (obrigatório).");
+
+            var lblTpNome = new Label { Text = "Tipo Nome:", Location = new Point(560, yPos), Size = new Size(80, 20) };
+            txtTpNome = new TextBox { Location = new Point(645, yPos - 3), Size = new Size(150, 23) };
+            toolTip.SetToolTip(lblTpNome, "Classificação do nome apresentado (opcional).\nConforme tabela de Tipos de Nome vigente.");
+            toolTip.SetToolTip(txtTpNome, "Tipo do nome (opcional).");
+
+            yPos += 35;
+            var lblEnderecoLivre = new Label { Text = "Endereço Livre:", Location = new Point(10, yPos), Size = new Size(100, 20) };
+            txtEnderecoLivreCadastro = new TextBox { Location = new Point(115, yPos - 3), Size = new Size(500, 23) };
+            toolTip.SetToolTip(lblEnderecoLivre, "Endereço principal da Entidade Declarante em formato livre.\nFormato: endereço/cep/cidade/UF");
+            toolTip.SetToolTip(txtEnderecoLivreCadastro, "Endereço principal em formato livre (obrigatório).");
+
+            var lblTpEndereco = new Label { Text = "Tipo Endereço:", Location = new Point(630, yPos), Size = new Size(100, 20) };
+            txtTpEnderecoCadastro = new TextBox { Location = new Point(735, yPos - 3), Size = new Size(150, 23) };
+            toolTip.SetToolTip(lblTpEndereco, "Tipo de endereço principal conforme tabela vigente (opcional).");
+            toolTip.SetToolTip(txtTpEnderecoCadastro, "Tipo de endereço (opcional).");
+
+            yPos += 35;
+            var lblMunicipio = new Label { Text = "Município (Código IBGE):", Location = new Point(10, yPos), Size = new Size(140, 20) };
+            txtMunicipioCadastro = new TextBox { Location = new Point(155, yPos - 3), Size = new Size(150, 23) };
+            toolTip.SetToolTip(lblMunicipio, "Código do município conforme tabela do IBGE (7 dígitos).");
+            toolTip.SetToolTip(txtMunicipioCadastro, "Código do município (obrigatório).");
+
+            var lblUF = new Label { Text = "UF:", Location = new Point(320, yPos), Size = new Size(50, 20) };
+            txtUFCadastro = new TextBox { Location = new Point(375, yPos - 3), Size = new Size(50, 23) };
+            toolTip.SetToolTip(lblUF, "Sigla da Unidade da Federação (UF).");
+            toolTip.SetToolTip(txtUFCadastro, "UF (obrigatório).");
+
+            var lblCEP = new Label { Text = "CEP:", Location = new Point(440, yPos), Size = new Size(50, 20) };
+            txtCEPCadastro = new TextBox { Location = new Point(495, yPos - 3), Size = new Size(100, 23) };
+            toolTip.SetToolTip(lblCEP, "CEP do endereço (8 dígitos, sem hífen).");
+            toolTip.SetToolTip(txtCEPCadastro, "CEP (obrigatório).");
+
+            var lblPais = new Label { Text = "País:", Location = new Point(610, yPos), Size = new Size(50, 20) };
+            txtPaisCadastro = new TextBox { Location = new Point(665, yPos - 3), Size = new Size(50, 23) };
+            txtPaisCadastro.Text = "BR";
+            toolTip.SetToolTip(lblPais, "Código do país conforme tabela ISO-3166-1 alfa 2.");
+            toolTip.SetToolTip(txtPaisCadastro, "Código do país (obrigatório, padrão: BR).");
+
+            yPos += 35;
+            var lblPaisResid = new Label { Text = "País Residência Fiscal:", Location = new Point(10, yPos), Size = new Size(140, 20) };
+            txtPaisResid = new TextBox { Location = new Point(155, yPos - 3), Size = new Size(200, 23) };
+            txtPaisResid.Text = "BR";
+            toolTip.SetToolTip(lblPaisResid, "País(es) de residência fiscal da entidade declarante.\nDeve conter pelo menos 'BR'. Pode conter múltiplos países separados por vírgula.");
+            toolTip.SetToolTip(txtPaisResid, "País(es) de residência fiscal (obrigatório, deve conter BR).\nExemplo: BR ou BR,US");
+
+            grpBasicos.Controls.AddRange(new Control[] {
+                lblTipoAmbiente, cmbTipoAmbienteCadastro,
+                lblAplicacaoEmissora, cmbAplicacaoEmissoraCadastro,
+                lblIndRetificacao, cmbIndRetificacaoCadastro, lblNrRecibo, txtNrReciboCadastro,
+                lblGIIN, txtGIIN, lblCategoriaDeclarante, txtCategoriaDeclarante,
+                lblNome, txtNomeCadastro, lblTpNome, txtTpNome,
+                lblEnderecoLivre, txtEnderecoLivreCadastro, lblTpEndereco, txtTpEnderecoCadastro,
+                lblMunicipio, txtMunicipioCadastro, lblUF, txtUFCadastro, lblCEP, txtCEPCadastro, lblPais, txtPaisCadastro,
+                lblPaisResid, txtPaisResid
+            });
+
+            scrollCadastroDeclarante.Controls.Add(grpBasicos);
+            tabCadastroDeclarante.Controls.Add(scrollCadastroDeclarante);
+        }
+
+        private void CmbIndRetificacaoCadastro_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            bool habilitar = cmbIndRetificacaoCadastro.SelectedIndex == 1 || cmbIndRetificacaoCadastro.SelectedIndex == 2;
+            txtNrReciboCadastro.Enabled = habilitar;
+            txtNrReciboCadastro.BackColor = habilitar ? SystemColors.Window : SystemColors.Control;
         }
 
         // Validações
@@ -890,7 +1233,7 @@ namespace ExemploAssinadorXML.Forms
 
             if (cnpj.Length != 14 || !cnpj.All(char.IsDigit))
             {
-                MessageBox.Show("CNPJ inválido. Deve conter 14 dígitos.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("CNPJ inválido. Deve conter 14 dígitos.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txt.Focus();
             }
         }
@@ -905,7 +1248,7 @@ namespace ExemploAssinadorXML.Forms
 
             if (cpf.Length != 11 || !cpf.All(char.IsDigit))
             {
-                MessageBox.Show("CPF inválido. Deve conter 11 dígitos.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("CPF inválido. Deve conter 11 dígitos.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txt.Focus();
             }
         }
@@ -920,7 +1263,7 @@ namespace ExemploAssinadorXML.Forms
 
             if (cep.Length != 8 || !cep.All(char.IsDigit))
             {
-                MessageBox.Show("CEP inválido. Deve conter 8 dígitos.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("CEP inválido. Deve conter 8 dígitos.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txt.Focus();
             }
         }
@@ -932,9 +1275,9 @@ namespace ExemploAssinadorXML.Forms
 
             if (string.IsNullOrEmpty(txt.Text)) return;
 
-            if (!DateTime.TryParseExact(txt.Text, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out _))
+            if (!DateTime.TryParseExact(txt.Text, "yyyy-MM-dd", CULTURE_INFO_PT_BR, System.Globalization.DateTimeStyles.None, out _))
             {
-                MessageBox.Show("Data inválida. Use o formato AAAA-MM-DD.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Data inválida. Use o formato AAAA-MM-DD.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txt.Focus();
             }
         }
@@ -949,9 +1292,187 @@ namespace ExemploAssinadorXML.Forms
             var regex = new Regex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$");
             if (!regex.IsMatch(txt.Text))
             {
-                MessageBox.Show("Email inválido.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Email inválido.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txt.Focus();
             }
+        }
+
+        /// <summary>
+        /// Calcula o período automaticamente baseado no semestre e ano selecionados
+        /// </summary>
+        private void CalcularPeriodoAutomatico()
+        {
+            if (!chkCalcularPeriodoAutomatico.Checked)
+                return;
+
+            int ano = (int)numAno.Value;
+            int semestre = cmbSemestre.SelectedIndex + 1; // 1 ou 2
+            
+            // Calcular período: YYYY01 para 1º semestre, YYYY02 para 2º semestre
+            string periodo = $"{ano}{semestre:00}";
+            txtPeriodo.Text = periodo;
+        }
+
+        /// <summary>
+        /// Preenche os campos de semestre e ano baseado no período informado
+        /// </summary>
+        private void PreencherSemestreAnoDoPeriodo(string periodo)
+        {
+            if (string.IsNullOrWhiteSpace(periodo) || periodo.Length != 6)
+                return;
+
+            if (!int.TryParse(periodo, out int periodoInt))
+                return;
+
+            int ano = periodoInt / 100;
+            int mes = periodoInt % 100;
+
+            // Determinar semestre baseado no mês
+            // 01 ou 06 = 1º semestre, 02 ou 12 = 2º semestre
+            int semestre;
+            if (mes == 1 || mes == 6)
+            {
+                semestre = 1;
+            }
+            else if (mes == 2 || mes == 12)
+            {
+                semestre = 2;
+            }
+            else
+            {
+                return; // Período inválido
+            }
+
+            // Preencher campos (sem disparar eventos para evitar loop)
+            bool calcularAutomatico = chkCalcularPeriodoAutomatico.Checked;
+            
+            numAno.Value = ano;
+            cmbSemestre.SelectedIndex = semestre - 1;
+            
+            if (calcularAutomatico)
+            {
+                txtPeriodo.Text = periodo;
+            }
+        }
+
+        /// <summary>
+        /// Calcula as datas de abertura automaticamente baseado no semestre e ano selecionados
+        /// </summary>
+        private void CalcularPeriodoAbertura()
+        {
+            if (!chkCalcularPeriodoAbertura.Checked)
+                return;
+
+            int ano = (int)numAnoAbertura.Value;
+            int semestre = cmbSemestreAbertura.SelectedIndex + 1; // 1 ou 2
+            
+            // Calcular datas: 1º semestre = 01/01 a 30/06, 2º semestre = 01/07 a 31/12
+            if (semestre == 1)
+            {
+                txtDtInicioAbertura.Text = $"{ano}-01-01";
+                txtDtFimAbertura.Text = $"{ano}-06-30";
+            }
+            else
+            {
+                txtDtInicioAbertura.Text = $"{ano}-07-01";
+                txtDtFimAbertura.Text = $"{ano}-12-31";
+            }
+        }
+
+        /// <summary>
+        /// Calcula as datas de fechamento automaticamente baseado no semestre e ano selecionados
+        /// </summary>
+        private void CalcularPeriodoFechamento()
+        {
+            if (!chkCalcularPeriodoFechamento.Checked)
+                return;
+
+            int ano = (int)numAnoFechamento.Value;
+            int semestre = cmbSemestreFechamento.SelectedIndex + 1; // 1 ou 2
+            
+            // Calcular datas: 1º semestre = 01/01 a 30/06, 2º semestre = 01/07 a 31/12
+            if (semestre == 1)
+            {
+                txtDtInicioFechamento.Text = $"{ano}-01-01";
+                txtDtFimFechamento.Text = $"{ano}-06-30";
+            }
+            else
+            {
+                txtDtInicioFechamento.Text = $"{ano}-07-01";
+                txtDtFimFechamento.Text = $"{ano}-12-31";
+            }
+        }
+
+        /// <summary>
+        /// Preenche os campos de semestre e ano na aba de Abertura baseado nas datas
+        /// </summary>
+        private void PreencherSemestreAnoAbertura(string dtInicio, string dtFim)
+        {
+            if (string.IsNullOrWhiteSpace(dtInicio) || string.IsNullOrWhiteSpace(dtFim))
+                return;
+
+            if (!DateTime.TryParse(dtInicio, CULTURE_INFO_PT_BR, System.Globalization.DateTimeStyles.None, out DateTime inicio) || 
+                !DateTime.TryParse(dtFim, CULTURE_INFO_PT_BR, System.Globalization.DateTimeStyles.None, out DateTime fim))
+                return;
+
+            int ano = inicio.Year;
+            int mesInicio = inicio.Month;
+            int mesFim = fim.Month;
+
+            // Determinar semestre: 1º = Jan-Jun (mes 1-6), 2º = Jul-Dez (mes 7-12)
+            int semestre;
+            if (mesInicio >= 1 && mesInicio <= 6 && mesFim >= 1 && mesFim <= 6)
+            {
+                semestre = 1;
+            }
+            else if (mesInicio >= 7 && mesInicio <= 12 && mesFim >= 7 && mesFim <= 12)
+            {
+                semestre = 2;
+            }
+            else
+            {
+                return; // Datas inválidas para um semestre
+            }
+
+            // Preencher campos (sem disparar eventos para evitar loop)
+            numAnoAbertura.Value = ano;
+            cmbSemestreAbertura.SelectedIndex = semestre - 1;
+        }
+
+        /// <summary>
+        /// Preenche os campos de semestre e ano na aba de Fechamento baseado nas datas
+        /// </summary>
+        private void PreencherSemestreAnoFechamento(string dtInicio, string dtFim)
+        {
+            if (string.IsNullOrWhiteSpace(dtInicio) || string.IsNullOrWhiteSpace(dtFim))
+                return;
+
+            if (!DateTime.TryParse(dtInicio, CULTURE_INFO_PT_BR, System.Globalization.DateTimeStyles.None, out DateTime inicio) || 
+                !DateTime.TryParse(dtFim, CULTURE_INFO_PT_BR, System.Globalization.DateTimeStyles.None, out DateTime fim))
+                return;
+
+            int ano = inicio.Year;
+            int mesInicio = inicio.Month;
+            int mesFim = fim.Month;
+
+            // Determinar semestre: 1º = Jan-Jun (mes 1-6), 2º = Jul-Dez (mes 7-12)
+            int semestre;
+            if (mesInicio >= 1 && mesInicio <= 6 && mesFim >= 1 && mesFim <= 6)
+            {
+                semestre = 1;
+            }
+            else if (mesInicio >= 7 && mesInicio <= 12 && mesFim >= 7 && mesFim <= 12)
+            {
+                semestre = 2;
+            }
+            else
+            {
+                return; // Datas inválidas para um semestre
+            }
+
+            // Preencher campos (sem disparar eventos para evitar loop)
+            numAnoFechamento.Value = ano;
+            cmbSemestreFechamento.SelectedIndex = semestre - 1;
         }
 
         private void CmbIndRetificacaoAbertura_SelectedIndexChanged(object sender, EventArgs e)
@@ -986,7 +1507,7 @@ namespace ExemploAssinadorXML.Forms
             }
         }
 
-        private X509Certificate2 SelecionarCertificado()
+        private static X509Certificate2 SelecionarCertificado()
         {
             X509Store store = new X509Store("MY", StoreLocation.CurrentUser);
             store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
@@ -1071,6 +1592,140 @@ namespace ExemploAssinadorXML.Forms
             }
         }
 
+        private void BtnLimparDadosTeste_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Validar CNPJ
+                if (string.IsNullOrWhiteSpace(txtCnpjDeclarante.Text))
+                {
+                    MessageBox.Show("CNPJ do declarante não informado.\n\nPor favor, preencha o CNPJ antes de executar a limpeza.", 
+                        "CNPJ Obrigatório", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Validar certificado
+                if (string.IsNullOrWhiteSpace(txtCertThumbprint.Text))
+                {
+                    MessageBox.Show("Certificado não configurado.\n\nPor favor, selecione um certificado antes de executar a limpeza.", 
+                        "Certificado Obrigatório", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Confirmar ação
+                DialogResult resultado = MessageBox.Show(
+                    $"Deseja realmente limpar os dados de teste para o CNPJ {txtCnpjDeclarante.Text}?\n\n" +
+                    "⚠️ ATENÇÃO: Esta ação é irreversível e excluirá todos os dados de teste no ambiente de Produção Restrita.\n\n" +
+                    "Certifique-se de que:\n" +
+                    "• O certificado possui permissão para o CNPJ informado\n" +
+                    "• Você realmente deseja excluir todos os dados de teste",
+                    "Confirmar Limpeza de Dados",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+
+                if (resultado != DialogResult.Yes)
+                {
+                    return;
+                }
+
+                // Desabilitar botão durante execução
+                btnLimparDadosTeste.Enabled = false;
+                btnLimparDadosTeste.Text = "Limpando...";
+                Application.DoEvents();
+
+                // Buscar certificado
+                X509Certificate2 certificado = BuscarCertificado(txtCertThumbprint.Text);
+
+                // Executar limpeza
+                var limpezaService = new EfinanceiraLimpezaService();
+                var resposta = limpezaService.LimparDadosTeste(txtCnpjDeclarante.Text, certificado);
+
+                // Exibir resultado
+                if (resposta.Sucesso)
+                {
+                    MessageBox.Show(
+                        $"✓ Limpeza executada com sucesso!\n\n" +
+                        $"Código HTTP: {resposta.CodigoHttp}\n" +
+                        $"Mensagem: {resposta.Mensagem}",
+                        "Limpeza Concluída",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"✗ Erro ao executar limpeza.\n\n" +
+                        $"Código HTTP: {resposta.CodigoHttp}\n" +
+                        $"Mensagem: {resposta.Mensagem}",
+                        "Erro na Limpeza",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Erro ao executar limpeza de dados:\n\n{ex.Message}",
+                    "Erro",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnLimparDadosTeste.Enabled = true;
+                btnLimparDadosTeste.Text = "Limpar Dados de Teste";
+            }
+        }
+
+        private static X509Certificate2 BuscarCertificado(string thumbprint)
+        {
+            if (string.IsNullOrEmpty(thumbprint))
+            {
+                throw new ArgumentException("Thumbprint do certificado não configurado.", nameof(thumbprint));
+            }
+
+            string thumbprintNormalizado = thumbprint.Replace(" ", "").Replace("-", "").ToUpper();
+
+            // Buscar no repositório CurrentUser\My
+            X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+            try
+            {
+                store.Open(OpenFlags.ReadOnly);
+                foreach (X509Certificate2 cert in store.Certificates)
+                {
+                    if (cert.Thumbprint.Replace(" ", "").Replace("-", "").ToUpper() == thumbprintNormalizado)
+                    {
+                        return cert;
+                    }
+                }
+            }
+            finally
+            {
+                store.Close();
+            }
+
+            // Buscar no repositório LocalMachine\My
+            store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
+            try
+            {
+                store.Open(OpenFlags.ReadOnly);
+                foreach (X509Certificate2 cert in store.Certificates)
+                {
+                    if (cert.Thumbprint.Replace(" ", "").Replace("-", "").ToUpper() == thumbprintNormalizado)
+                    {
+                        return cert;
+                    }
+                }
+            }
+            finally
+            {
+                store.Close();
+            }
+
+            throw new InvalidOperationException($"Certificado com thumbprint '{thumbprint}' não encontrado no repositório do Windows.");
+        }
+
         private void BtnSalvarConfig_Click(object sender, EventArgs e)
         {
             try
@@ -1096,10 +1751,10 @@ namespace ExemploAssinadorXML.Forms
                     OffsetRegistros = (int)numOffsetRegistros.Value,
                     MaxLotes = chkMaxLotesIlimitado.Checked ? null : (int?)numMaxLotes.Value,
                     EventosPorLote = numEventosPorLote != null ? (int)numEventosPorLote.Value : 50,
-                    UrlTeste = "https://pre-efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto",
-                    UrlProducao = "https://efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto",
-                    UrlConsultaTeste = "https://pre-efinanceira.receita.fazenda.gov.br/consulta/lotes/",
-                    UrlConsultaProducao = "https://efinanceira.receita.fazenda.gov.br/consulta/lotes/"
+                    UrlTeste = URL_TESTE,
+                    UrlProducao = URL_PRODUCAO,
+                    UrlConsultaTeste = URL_CONSULTA_TESTE,
+                    UrlConsultaProducao = URL_CONSULTA_PRODUCAO
                 };
 
                 // Salvar dados de abertura
@@ -1135,8 +1790,11 @@ namespace ExemploAssinadorXML.Forms
                     FechamentoMovOpFinAnual = chkFechamentoMovOpFinAnual.Checked ? (int?)1 : null
                 };
 
+                // Salvar dados de cadastro de declarante
+                DadosCadastroDeclarante = CriarDadosCadastroDeclarante();
+
                 // Persistir
-                persistenciaService.SalvarConfiguracao(Config, DadosAbertura, DadosFechamento);
+                persistenciaService.SalvarConfiguracao(Config, DadosAbertura, DadosFechamento, DadosCadastroDeclarante);
 
                 MessageBox.Show("Configurações salvas com sucesso!", "Sucesso", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -1150,32 +1808,29 @@ namespace ExemploAssinadorXML.Forms
         {
             if (string.IsNullOrWhiteSpace(txtCnpjDeclarante.Text))
             {
-                MessageBox.Show("CNPJ Declarante é obrigatório.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("CNPJ Declarante é obrigatório.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtCnpjDeclarante.Focus();
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(txtDtInicioAbertura.Text))
             {
-                MessageBox.Show("Data de início da abertura é obrigatória.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Data de início da abertura é obrigatória.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtDtInicioAbertura.Focus();
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(txtDtFimAbertura.Text))
             {
-                MessageBox.Show("Data de fim da abertura é obrigatória.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Data de fim da abertura é obrigatória.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtDtFimAbertura.Focus();
                 return false;
             }
 
-            if (chkIndicarMovOpFin.Checked)
+            if (chkIndicarMovOpFin.Checked && (string.IsNullOrWhiteSpace(txtRMF_CPF.Text) || string.IsNullOrWhiteSpace(txtRespeFin_CPF.Text)))
             {
-                if (string.IsNullOrWhiteSpace(txtRMF_CPF.Text) || string.IsNullOrWhiteSpace(txtRespeFin_CPF.Text))
-                {
-                    MessageBox.Show("Ao indicar MovOpFin, é necessário preencher CPF do Responsável RMF e RespeFin.", "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Ao indicar MovOpFin, é necessário preencher CPF do Responsável RMF e RespeFin.", TITULO_VALIDACAO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
-                }
             }
 
             // Validação de fechamento: se não for "nada a declarar", deve ter pelo menos um fechamento
@@ -1264,32 +1919,103 @@ namespace ExemploAssinadorXML.Forms
             };
         }
 
+        private DadosCadastroDeclarante CriarDadosCadastroDeclarante()
+        {
+            var dados = new DadosCadastroDeclarante
+            {
+                CnpjDeclarante = txtCnpjDeclarante.Text,
+                TipoAmbiente = cmbTipoAmbienteCadastro.SelectedIndex + 1,
+                AplicacaoEmissora = cmbAplicacaoEmissoraCadastro.SelectedIndex + 1,
+                IndRetificacao = cmbIndRetificacaoCadastro.SelectedIndex + 1,
+                NrRecibo = txtNrReciboCadastro.Text,
+                GIIN = string.IsNullOrWhiteSpace(txtGIIN.Text) ? null : txtGIIN.Text,
+                CategoriaDeclarante = string.IsNullOrWhiteSpace(txtCategoriaDeclarante.Text) ? null : txtCategoriaDeclarante.Text,
+                Nome = txtNomeCadastro.Text,
+                TpNome = string.IsNullOrWhiteSpace(txtTpNome.Text) ? null : txtTpNome.Text,
+                EnderecoLivre = txtEnderecoLivreCadastro.Text,
+                TpEndereco = string.IsNullOrWhiteSpace(txtTpEnderecoCadastro.Text) ? null : txtTpEnderecoCadastro.Text,
+                Municipio = txtMunicipioCadastro.Text,
+                UF = txtUFCadastro.Text,
+                CEP = txtCEPCadastro.Text,
+                Pais = string.IsNullOrWhiteSpace(txtPaisCadastro.Text) ? "BR" : txtPaisCadastro.Text
+            };
+
+            // Processar países de residência fiscal
+            if (!string.IsNullOrWhiteSpace(txtPaisResid.Text))
+            {
+                dados.PaisResid = txtPaisResid.Text.Split(',').Select(p => p.Trim()).ToList();
+            }
+            else
+            {
+                dados.PaisResid = new List<string> { "BR" };
+            }
+
+            // Por enquanto, não implementamos NIFs, TiposInstPgto e EnderecosOutros
+            // Podem ser adicionados posteriormente se necessário
+            dados.NIFs = new List<DadosNIF>();
+            dados.TiposInstPgto = new List<DadosTipoInstPgto>();
+            dados.EnderecosOutros = new List<DadosEnderecoOutros>();
+
+            return dados;
+        }
+
         private void CarregarConfiguracaoNaTela(ConfiguracaoCompleta configCompleta)
         {
             if (configCompleta.Config != null)
             {
-                txtCnpjDeclarante.Text = configCompleta.Config.CnpjDeclarante ?? "";
-                txtCertThumbprint.Text = configCompleta.Config.CertThumbprint ?? "";
-                txtCertServidorThumbprint.Text = configCompleta.Config.CertServidorThumbprint ?? "";
-                cmbAmbiente.SelectedItem = configCompleta.Config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : "TEST";
-                chkModoTeste.Checked = configCompleta.Config.ModoTeste;
-                chkHabilitarEnvio.Checked = configCompleta.Config.TestEnvioHabilitado;
-                txtDiretorioLotes.Text = configCompleta.Config.DiretorioLotes ?? "";
-                txtPeriodo.Text = configCompleta.Config.Periodo ?? "";
+                CarregarConfiguracaoGeral(configCompleta.Config);
+            }
+
+            if (configCompleta.DadosAbertura != null)
+            {
+                CarregarDadosAbertura(configCompleta.DadosAbertura);
+            }
+
+            if (configCompleta.DadosFechamento != null)
+            {
+                CarregarDadosFechamento(configCompleta.DadosFechamento);
+            }
+
+            if (configCompleta.DadosCadastroDeclarante != null)
+            {
+                CarregarDadosCadastroDeclarante(configCompleta.DadosCadastroDeclarante);
+            }
+        }
+
+        private void CarregarConfiguracaoGeral(EfinanceiraConfig config)
+        {
+            txtCnpjDeclarante.Text = config.CnpjDeclarante ?? "";
+            txtCertThumbprint.Text = config.CertThumbprint ?? "";
+            txtCertServidorThumbprint.Text = config.CertServidorThumbprint ?? "";
+            cmbAmbiente.SelectedItem = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : "TEST";
+            chkModoTeste.Checked = config.ModoTeste;
+            chkHabilitarEnvio.Checked = config.TestEnvioHabilitado;
+            txtDiretorioLotes.Text = config.DiretorioLotes ?? "";
+            
+            // Carregar período e preencher semestre/ano se houver
+            string periodoSalvo = config.Periodo ?? "";
+            if (!string.IsNullOrEmpty(periodoSalvo))
+            {
+                PreencherSemestreAnoDoPeriodo(periodoSalvo);
+            }
+            else
+            {
+                CalcularPeriodoAutomatico();
+            }
                 
                 // Carregar configurações de processamento
-                numPageSize.Value = configCompleta.Config.PageSize > 0 ? configCompleta.Config.PageSize : 500;
-                numEventoOffset.Value = configCompleta.Config.EventoOffset >= 0 ? configCompleta.Config.EventoOffset : 1;
-                numOffsetRegistros.Value = configCompleta.Config.OffsetRegistros >= 0 ? configCompleta.Config.OffsetRegistros : 0;
+            numPageSize.Value = config.PageSize > 0 ? config.PageSize : 500;
+            numEventoOffset.Value = config.EventoOffset >= 0 ? config.EventoOffset : 1;
+            numOffsetRegistros.Value = config.OffsetRegistros >= 0 ? config.OffsetRegistros : 0;
                 if (numEventosPorLote != null)
                 {
-                    numEventosPorLote.Value = configCompleta.Config.EventosPorLote > 0 && configCompleta.Config.EventosPorLote <= 50 
-                        ? configCompleta.Config.EventosPorLote : 50;
+                numEventosPorLote.Value = config.EventosPorLote > 0 && config.EventosPorLote <= 50 
+                    ? config.EventosPorLote : 50;
                 }
-                if (configCompleta.Config.MaxLotes.HasValue)
+            if (config.MaxLotes.HasValue)
                 {
                     chkMaxLotesIlimitado.Checked = false;
-                    numMaxLotes.Value = configCompleta.Config.MaxLotes.Value;
+                numMaxLotes.Value = config.MaxLotes.Value;
                 }
                 else
                 {
@@ -1297,9 +2023,14 @@ namespace ExemploAssinadorXML.Forms
                 }
             }
 
-            if (configCompleta.DadosAbertura != null)
+        private void CarregarDadosAbertura(DadosAbertura dados)
+        {
+            // Preencher semestre e ano baseado nas datas
+            if (!string.IsNullOrEmpty(dados.DtInicio) && !string.IsNullOrEmpty(dados.DtFim))
             {
-                var dados = configCompleta.DadosAbertura;
+                PreencherSemestreAnoAbertura(dados.DtInicio, dados.DtFim);
+            }
+            
                 txtDtInicioAbertura.Text = dados.DtInicio ?? "";
                 txtDtFimAbertura.Text = dados.DtFim ?? "";
                 cmbTipoAmbienteAbertura.SelectedIndex = dados.TipoAmbiente > 0 ? dados.TipoAmbiente - 1 : 1;
@@ -1310,53 +2041,73 @@ namespace ExemploAssinadorXML.Forms
 
                 if (dados.ResponsavelRMF != null)
                 {
-                    txtRMF_CNPJ.Text = dados.ResponsavelRMF.Cnpj ?? "";
-                    txtRMF_CPF.Text = dados.ResponsavelRMF.Cpf ?? "";
-                    txtRMF_Nome.Text = dados.ResponsavelRMF.Nome ?? "";
-                    txtRMF_Setor.Text = dados.ResponsavelRMF.Setor ?? "";
-                    txtRMF_DDD.Text = dados.ResponsavelRMF.TelefoneDDD ?? "";
-                    txtRMF_Telefone.Text = dados.ResponsavelRMF.TelefoneNumero ?? "";
-                    txtRMF_Ramal.Text = dados.ResponsavelRMF.TelefoneRamal ?? "";
-                    txtRMF_Logradouro.Text = dados.ResponsavelRMF.EnderecoLogradouro ?? "";
-                    txtRMF_Numero.Text = dados.ResponsavelRMF.EnderecoNumero ?? "";
-                    txtRMF_Complemento.Text = dados.ResponsavelRMF.EnderecoComplemento ?? "";
-                    txtRMF_Bairro.Text = dados.ResponsavelRMF.EnderecoBairro ?? "";
-                    txtRMF_CEP.Text = dados.ResponsavelRMF.EnderecoCEP ?? "";
-                    txtRMF_Municipio.Text = dados.ResponsavelRMF.EnderecoMunicipio ?? "";
-                    txtRMF_UF.Text = dados.ResponsavelRMF.EnderecoUF ?? "";
+                CarregarDadosResponsavelRMF(dados.ResponsavelRMF);
                 }
 
                 if (dados.RespeFin != null)
                 {
-                    txtRespeFin_CPF.Text = dados.RespeFin.Cpf ?? "";
-                    txtRespeFin_Nome.Text = dados.RespeFin.Nome ?? "";
-                    txtRespeFin_Setor.Text = dados.RespeFin.Setor ?? "";
-                    txtRespeFin_DDD.Text = dados.RespeFin.TelefoneDDD ?? "";
-                    txtRespeFin_Telefone.Text = dados.RespeFin.TelefoneNumero ?? "";
-                    txtRespeFin_Ramal.Text = dados.RespeFin.TelefoneRamal ?? "";
-                    txtRespeFin_Logradouro.Text = dados.RespeFin.EnderecoLogradouro ?? "";
-                    txtRespeFin_Numero.Text = dados.RespeFin.EnderecoNumero ?? "";
-                    txtRespeFin_Complemento.Text = dados.RespeFin.EnderecoComplemento ?? "";
-                    txtRespeFin_Bairro.Text = dados.RespeFin.EnderecoBairro ?? "";
-                    txtRespeFin_CEP.Text = dados.RespeFin.EnderecoCEP ?? "";
-                    txtRespeFin_Municipio.Text = dados.RespeFin.EnderecoMunicipio ?? "";
-                    txtRespeFin_UF.Text = dados.RespeFin.EnderecoUF ?? "";
-                    txtRespeFin_Email.Text = dados.RespeFin.Email ?? "";
+                CarregarDadosRespeFin(dados.RespeFin);
                 }
 
                 if (dados.RepresLegal != null)
                 {
-                    txtRepresLegal_CPF.Text = dados.RepresLegal.Cpf ?? "";
-                    txtRepresLegal_Setor.Text = dados.RepresLegal.Setor ?? "";
-                    txtRepresLegal_DDD.Text = dados.RepresLegal.TelefoneDDD ?? "";
-                    txtRepresLegal_Telefone.Text = dados.RepresLegal.TelefoneNumero ?? "";
-                    txtRepresLegal_Ramal.Text = dados.RepresLegal.TelefoneRamal ?? "";
-                }
+                CarregarDadosRepresLegal(dados.RepresLegal);
             }
+        }
 
-            if (configCompleta.DadosFechamento != null)
+        private void CarregarDadosResponsavelRMF(DadosResponsavelRMF responsavelRMF)
+        {
+            txtRMF_CNPJ.Text = responsavelRMF.Cnpj ?? "";
+            txtRMF_CPF.Text = responsavelRMF.Cpf ?? "";
+            txtRMF_Nome.Text = responsavelRMF.Nome ?? "";
+            txtRMF_Setor.Text = responsavelRMF.Setor ?? "";
+            txtRMF_DDD.Text = responsavelRMF.TelefoneDDD ?? "";
+            txtRMF_Telefone.Text = responsavelRMF.TelefoneNumero ?? "";
+            txtRMF_Ramal.Text = responsavelRMF.TelefoneRamal ?? "";
+            txtRMF_Logradouro.Text = responsavelRMF.EnderecoLogradouro ?? "";
+            txtRMF_Numero.Text = responsavelRMF.EnderecoNumero ?? "";
+            txtRMF_Complemento.Text = responsavelRMF.EnderecoComplemento ?? "";
+            txtRMF_Bairro.Text = responsavelRMF.EnderecoBairro ?? "";
+            txtRMF_CEP.Text = responsavelRMF.EnderecoCEP ?? "";
+            txtRMF_Municipio.Text = responsavelRMF.EnderecoMunicipio ?? "";
+            txtRMF_UF.Text = responsavelRMF.EnderecoUF ?? "";
+        }
+
+        private void CarregarDadosRespeFin(DadosRespeFin respeFin)
+        {
+            txtRespeFin_CPF.Text = respeFin.Cpf ?? "";
+            txtRespeFin_Nome.Text = respeFin.Nome ?? "";
+            txtRespeFin_Setor.Text = respeFin.Setor ?? "";
+            txtRespeFin_DDD.Text = respeFin.TelefoneDDD ?? "";
+            txtRespeFin_Telefone.Text = respeFin.TelefoneNumero ?? "";
+            txtRespeFin_Ramal.Text = respeFin.TelefoneRamal ?? "";
+            txtRespeFin_Logradouro.Text = respeFin.EnderecoLogradouro ?? "";
+            txtRespeFin_Numero.Text = respeFin.EnderecoNumero ?? "";
+            txtRespeFin_Complemento.Text = respeFin.EnderecoComplemento ?? "";
+            txtRespeFin_Bairro.Text = respeFin.EnderecoBairro ?? "";
+            txtRespeFin_CEP.Text = respeFin.EnderecoCEP ?? "";
+            txtRespeFin_Municipio.Text = respeFin.EnderecoMunicipio ?? "";
+            txtRespeFin_UF.Text = respeFin.EnderecoUF ?? "";
+            txtRespeFin_Email.Text = respeFin.Email ?? "";
+        }
+
+        private void CarregarDadosRepresLegal(DadosRepresLegal represLegal)
+        {
+            txtRepresLegal_CPF.Text = represLegal.Cpf ?? "";
+            txtRepresLegal_Setor.Text = represLegal.Setor ?? "";
+            txtRepresLegal_DDD.Text = represLegal.TelefoneDDD ?? "";
+            txtRepresLegal_Telefone.Text = represLegal.TelefoneNumero ?? "";
+            txtRepresLegal_Ramal.Text = represLegal.TelefoneRamal ?? "";
+        }
+
+        private void CarregarDadosFechamento(DadosFechamento dados)
+        {
+            // Preencher semestre e ano baseado nas datas
+            if (!string.IsNullOrEmpty(dados.DtInicio) && !string.IsNullOrEmpty(dados.DtFim))
             {
-                var dados = configCompleta.DadosFechamento;
+                PreencherSemestreAnoFechamento(dados.DtInicio, dados.DtFim);
+            }
+            
                 txtDtInicioFechamento.Text = dados.DtInicio ?? "";
                 txtDtFimFechamento.Text = dados.DtFim ?? "";
                 cmbTipoAmbienteFechamento.SelectedIndex = dados.TipoAmbiente > 0 ? dados.TipoAmbiente - 1 : 1;
@@ -1365,9 +2116,35 @@ namespace ExemploAssinadorXML.Forms
                 txtNrReciboFechamento.Text = dados.NrRecibo ?? "";
                 cmbSitEspecial.SelectedIndex = Array.IndexOf(new[] { 0, 1, 2, 3, 5 }, dados.SitEspecial);
                 chkNadaADeclarar.Checked = dados.NadaADeclarar == "1";
-                chkFechamentoPP.Checked = dados.FechamentoPP > 0;
-                chkFechamentoMovOpFin.Checked = dados.FechamentoMovOpFin > 0;
-                chkFechamentoMovOpFinAnual.Checked = dados.FechamentoMovOpFinAnual > 0;
+            chkFechamentoPP.Checked = dados.FechamentoPP > 0;
+            chkFechamentoMovOpFin.Checked = dados.FechamentoMovOpFin > 0;
+            chkFechamentoMovOpFinAnual.Checked = dados.FechamentoMovOpFinAnual > 0;
+        }
+
+        private void CarregarDadosCadastroDeclarante(DadosCadastroDeclarante dados)
+        {
+            cmbTipoAmbienteCadastro.SelectedIndex = dados.TipoAmbiente > 0 ? dados.TipoAmbiente - 1 : 1;
+            cmbAplicacaoEmissoraCadastro.SelectedIndex = dados.AplicacaoEmissora > 0 ? dados.AplicacaoEmissora - 1 : 0;
+            cmbIndRetificacaoCadastro.SelectedIndex = dados.IndRetificacao > 0 ? dados.IndRetificacao - 1 : 0;
+            txtNrReciboCadastro.Text = dados.NrRecibo ?? "";
+            txtGIIN.Text = dados.GIIN ?? "";
+            txtCategoriaDeclarante.Text = dados.CategoriaDeclarante ?? "";
+            txtNomeCadastro.Text = dados.Nome ?? "";
+            txtTpNome.Text = dados.TpNome ?? "";
+            txtEnderecoLivreCadastro.Text = dados.EnderecoLivre ?? "";
+            txtTpEnderecoCadastro.Text = dados.TpEndereco ?? "";
+            txtMunicipioCadastro.Text = dados.Municipio ?? "";
+            txtUFCadastro.Text = dados.UF ?? "";
+            txtCEPCadastro.Text = dados.CEP ?? "";
+            txtPaisCadastro.Text = dados.Pais ?? "BR";
+            
+            if (dados.PaisResid != null && dados.PaisResid.Count > 0)
+            {
+                txtPaisResid.Text = string.Join(",", dados.PaisResid);
+            }
+            else
+            {
+                txtPaisResid.Text = "BR";
             }
         }
 
@@ -1457,12 +2234,10 @@ namespace ExemploAssinadorXML.Forms
             }
 
             // Marcar IndicarMovOpFin como true se houver dados preenchidos
-            if (chkIndicarMovOpFin != null && !chkIndicarMovOpFin.Checked)
-            {
-                if (!string.IsNullOrEmpty(txtRMF_CPF.Text) || !string.IsNullOrEmpty(txtRespeFin_CPF.Text))
+            if (chkIndicarMovOpFin != null && !chkIndicarMovOpFin.Checked && 
+                (!string.IsNullOrEmpty(txtRMF_CPF.Text) || !string.IsNullOrEmpty(txtRespeFin_CPF.Text)))
                 {
                     chkIndicarMovOpFin.Checked = true;
-                }
             }
 
             // Fechamento

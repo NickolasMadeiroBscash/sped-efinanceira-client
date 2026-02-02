@@ -9,8 +9,21 @@ using ExemploAssinadorXML.Models;
 
 namespace ExemploAssinadorXML.Services
 {
+    public class EfinanceiraEnvioException : Exception
+    {
+        public EfinanceiraEnvioException(string message) : base(message)
+        {
+        }
+
+        public EfinanceiraEnvioException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
+    }
+
     public class EfinanceiraEnvioService
     {
+        private const string EFINANCEIRA_XML_NAMESPACE = "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0";
+
         public RespostaEnvioEfinanceira EnviarLote(string caminhoArquivoCriptografado, EfinanceiraConfig config, X509Certificate2 certificado)
         {
             try
@@ -21,7 +34,7 @@ namespace ExemploAssinadorXML.Services
 
                 if (string.IsNullOrEmpty(url))
                 {
-                    throw new Exception("URL de envio não configurada.");
+                    throw new EfinanceiraEnvioException("URL de envio não configurada.");
                 }
 
                 string xmlCriptografado = File.ReadAllText(caminhoArquivoCriptografado, Encoding.UTF8);
@@ -70,7 +83,7 @@ namespace ExemploAssinadorXML.Services
                     }
                     else
                     {
-                        throw new Exception($"Erro ao enviar lote: {wex.Message}", wex);
+                        throw new EfinanceiraEnvioException($"Erro ao enviar lote: {wex.Message}", wex);
                     }
                 }
                 finally
@@ -106,18 +119,22 @@ namespace ExemploAssinadorXML.Services
                     using (StreamReader reader = new StreamReader(ex.Response.GetResponseStream(), Encoding.UTF8))
                     {
                         string erro = reader.ReadToEnd();
-                        throw new Exception($"Erro ao enviar lote: {erro}", ex);
+                        throw new EfinanceiraEnvioException($"Erro ao enviar lote: {erro}", ex);
                     }
                 }
-                throw new Exception($"Erro ao enviar lote: {ex.Message}", ex);
+                throw new EfinanceiraEnvioException($"Erro ao enviar lote: {ex.Message}", ex);
+            }
+            catch (EfinanceiraEnvioException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Erro ao enviar lote: {ex.Message}", ex);
+                throw new EfinanceiraEnvioException($"Erro ao enviar lote: {ex.Message}", ex);
             }
         }
 
-        private RespostaEnvioEfinanceira ProcessarRespostaEnvio(RespostaEnvioEfinanceira resposta)
+        private static RespostaEnvioEfinanceira ProcessarRespostaEnvio(RespostaEnvioEfinanceira resposta)
         {
             try
             {
@@ -126,7 +143,7 @@ namespace ExemploAssinadorXML.Services
 
                 // Tentar diferentes namespaces e nomes de tags (baseado no código Java)
                 XmlNamespaceManager nsmgr = new XmlNamespaceManager(doc.NameTable);
-                nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                nsmgr.AddNamespace("ns", EFINANCEIRA_XML_NAMESPACE);
                 nsmgr.AddNamespace("", ""); // Namespace vazio também
 
                 // Buscar cdResposta (código de resposta)

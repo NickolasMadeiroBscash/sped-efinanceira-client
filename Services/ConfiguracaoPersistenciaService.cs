@@ -11,7 +11,7 @@ namespace ExemploAssinadorXML.Services
     {
         private const string CONFIG_FILE = "efinanceira_config.xml";
 
-        public void SalvarConfiguracao(EfinanceiraConfig config, DadosAbertura dadosAbertura, DadosFechamento dadosFechamento)
+        public void SalvarConfiguracao(EfinanceiraConfig config, DadosAbertura dadosAbertura, DadosFechamento dadosFechamento, DadosCadastroDeclarante dadosCadastroDeclarante = null)
         {
             try
             {
@@ -20,6 +20,7 @@ namespace ExemploAssinadorXML.Services
                     Config = config,
                     DadosAbertura = dadosAbertura,
                     DadosFechamento = dadosFechamento,
+                    DadosCadastroDeclarante = dadosCadastroDeclarante,
                     DataSalvamento = DateTime.Now
                 };
 
@@ -33,7 +34,7 @@ namespace ExemploAssinadorXML.Services
             }
             catch (Exception ex)
             {
-                throw new Exception($"Erro ao salvar configuração: {ex.Message}", ex);
+                throw new InvalidOperationException($"Erro ao salvar configuração: {ex.Message}", ex);
             }
         }
 
@@ -56,11 +57,11 @@ namespace ExemploAssinadorXML.Services
             }
             catch (Exception ex)
             {
-                throw new Exception($"Erro ao carregar configuração: {ex.Message}", ex);
+                throw new InvalidOperationException($"Erro ao carregar configuração: {ex.Message}", ex);
             }
         }
 
-        private string ObterCaminhoArquivo()
+        private static string ObterCaminhoArquivo()
         {
             string diretorio = Path.Combine(Application.StartupPath, "config");
             if (!Directory.Exists(diretorio))
@@ -78,6 +79,7 @@ namespace ExemploAssinadorXML.Services
         public EfinanceiraConfig Config { get; set; }
         public DadosAbertura DadosAbertura { get; set; }
         public DadosFechamento DadosFechamento { get; set; }
+        public DadosCadastroDeclarante DadosCadastroDeclarante { get; set; }
         public DateTime DataSalvamento { get; set; }
     }
 }

@@ -14,6 +14,9 @@ namespace ExemploAssinadorXML.Services
         // AES/CBC/PKCS7Padding é equivalente a AES/CBC/PKCS5Padding no .NET
         // O .NET usa PKCS7Padding que é compatível com PKCS5Padding
         // RSA/ECB/PKCS1Padding - não usado diretamente, usamos RSA.Encrypt com RSAEncryptionPadding.Pkcs1
+        // NOTA: PKCS1 é usado para compatibilidade com o padrão eFinanceira, mesmo não sendo o mais seguro
+        // O padrão eFinanceira requer RSA/ECB/PKCS1Padding conforme especificação
+        private static readonly RSAEncryptionPadding RSA_PADDING = RSAEncryptionPadding.Pkcs1;
 
         public string CriptografarLote(string caminhoArquivoXml, string thumbprintCertificado)
         {
@@ -38,7 +41,11 @@ namespace ExemploAssinadorXML.Services
                 byte[] chaveConcat = ConcatenarBytes(chaveAESBytes, vetorAES);
 
                 // Criptografar chave com RSA
-                byte[] chaveCriptografada = rsaPublica.Encrypt(chaveConcat, RSAEncryptionPadding.Pkcs1);
+                // Usando PKCS1 conforme especificação eFinanceira (RSA/ECB/PKCS1Padding)
+                // SonarLint S5542: PKCS1 é necessário para compatibilidade com o padrão eFinanceira
+#pragma warning disable S5542 // Use secure mode and padding scheme
+                byte[] chaveCriptografada = rsaPublica.Encrypt(chaveConcat, RSA_PADDING);
+#pragma warning restore S5542
                 string chaveCriptografadaBase64 = Convert.ToBase64String(chaveCriptografada);
 
                 // Gerar XML criptografado
@@ -51,13 +58,17 @@ namespace ExemploAssinadorXML.Services
 
                 return caminhoArquivoSaida;
             }
+            catch (CryptographicException ex)
+            {
+                throw new CryptographicException($"Erro ao criptografar lote: {ex.Message}", ex);
+            }
             catch (Exception ex)
             {
-                throw new Exception($"Erro ao criptografar lote: {ex.Message}", ex);
+                throw new InvalidOperationException($"Erro ao criptografar lote: {ex.Message}", ex);
             }
         }
 
-        private string LerENormalizarXml(string caminho)
+        private static string LerENormalizarXml(string caminho)
         {
             try
             {
@@ -76,13 +87,17 @@ namespace ExemploAssinadorXML.Services
                     return sw.ToString();
                 }
             }
+            catch (XmlException ex)
+            {
+                throw new XmlException($"Erro ao ler e normalizar XML: {ex.Message}", ex);
+            }
             catch (Exception ex)
             {
-                throw new Exception($"Erro ao ler e normalizar XML: {ex.Message}", ex);
+                throw new InvalidOperationException($"Erro ao ler e normalizar XML: {ex.Message}", ex);
             }
         }
 
-        private byte[] GerarChaveAES()
+        private static byte[] GerarChaveAES()
         {
             using (Aes aes = Aes.Create())
             {
@@ -92,17 +107,17 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private byte[] GerarVetorInicializacao()
+        private static byte[] GerarVetorInicializacao()
         {
             byte[] iv = new byte[16];
-            using (RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider())
+            using (RandomNumberGenerator rng = RandomNumberGenerator.Create())
             {
                 rng.GetBytes(iv);
             }
             return iv;
         }
 
-        private byte[] CriptografarComAES(string xml, byte[] chave, byte[] iv)
+        private static byte[] CriptografarComAES(string xml, byte[] chave, byte[] iv)
         {
             using (Aes aes = Aes.Create())
             {
@@ -119,7 +134,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private X509Certificate2 BuscarCertificadoNoWindows(string thumbprint)
+        private static X509Certificate2 BuscarCertificadoNoWindows(string thumbprint)
         {
             string thumbprintNormalizado = thumbprint.Replace(" ", "").Replace("-", "").ToUpper();
 
@@ -180,10 +195,10 @@ namespace ExemploAssinadorXML.Services
                 store.Close();
             }
 
-            throw new Exception($"Certificado com thumbprint '{thumbprint}' não encontrado no repositório do Windows.");
+            throw new InvalidOperationException($"Certificado com thumbprint '{thumbprint}' não encontrado no repositório do Windows.");
         }
 
-        private byte[] ConcatenarBytes(byte[] a, byte[] b)
+        private static byte[] ConcatenarBytes(byte[] a, byte[] b)
         {
             byte[] resultado = new byte[a.Length + b.Length];
             Buffer.BlockCopy(a, 0, resultado, 0, a.Length);
@@ -191,7 +206,7 @@ namespace ExemploAssinadorXML.Services
             return resultado;
         }
 
-        private string GerarXmlCriptografado(
+        private static string GerarXmlCriptografado(
             string caminhoArquivoOriginal,
             string xmlCriptografadoBase64,
             string thumbprintCertificado,

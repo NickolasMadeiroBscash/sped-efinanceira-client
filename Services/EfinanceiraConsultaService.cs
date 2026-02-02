@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
@@ -21,10 +22,15 @@ namespace ExemploAssinadorXML.Services
 
                 if (string.IsNullOrEmpty(url))
                 {
-                    throw new Exception("URL de consulta não configurada.");
+                    throw new InvalidOperationException("URL de consulta não configurada.");
                 }
 
-                url = url.TrimEnd('/') + "/" + protocolo;
+                // Garantir que a URL termine com '/' antes de adicionar o protocolo
+                if (!url.EndsWith("/"))
+                {
+                    url = url + "/";
+                }
+                url = url + protocolo;
 
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "GET";
@@ -59,7 +65,7 @@ namespace ExemploAssinadorXML.Services
                     }
                     else
                     {
-                        throw new Exception($"Erro de rede ao consultar protocolo: {wex.Message}", wex);
+                        throw new InvalidOperationException($"Erro de rede ao consultar protocolo: {wex.Message}", wex);
                     }
                 }
                 finally
@@ -85,7 +91,7 @@ namespace ExemploAssinadorXML.Services
             }
             catch (Exception ex)
             {
-                throw new Exception($"Erro ao consultar protocolo: {ex.Message}", ex);
+                throw new InvalidOperationException($"Erro ao consultar protocolo: {ex.Message}", ex);
             }
         }
 
@@ -103,8 +109,10 @@ namespace ExemploAssinadorXML.Services
 
                 // Namespace manager
                 XmlNamespaceManager nsmgr = new XmlNamespaceManager(doc.NameTable);
-                nsmgr.AddNamespace("ef", "http://www.eFinanceira.gov.br/schemas/retornoLoteEventosAssincrono/v1_0_0");
-                nsmgr.AddNamespace("evt", "http://www.eFinanceira.gov.br/schemas/retornoEvento/v1_3_0");
+                const string namespaceEf = "http://www.eFinanceira.gov.br/schemas/retornoLoteEventosAssincrono/v1_0_0";
+                const string namespaceEvt = "http://www.eFinanceira.gov.br/schemas/retornoEvento/v1_3_0";
+                nsmgr.AddNamespace("ef", namespaceEf);
+                nsmgr.AddNamespace("evt", namespaceEvt);
 
                 // Buscar cdResposta (código de resposta do lote)
                 XmlNodeList cdRespostaList = doc.GetElementsByTagName("cdResposta");
@@ -131,7 +139,7 @@ namespace ExemploAssinadorXML.Services
                     XmlElement dadosRecepcao = (XmlElement)dadosRecepcaoList[0];
                     
                     XmlNodeList dhRecepcaoList = dadosRecepcao.GetElementsByTagName("dhRecepcao");
-                    if (dhRecepcaoList.Count > 0 && DateTime.TryParse(dhRecepcaoList[0].InnerText.Trim(), out DateTime dtRecepcao))
+                    if (dhRecepcaoList.Count > 0 && DateTime.TryParse(dhRecepcaoList[0].InnerText.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dtRecepcao))
                     {
                         resposta.DataRecepcao = dtRecepcao;
                     }
@@ -156,7 +164,7 @@ namespace ExemploAssinadorXML.Services
                     XmlElement dadosProcessamento = (XmlElement)dadosProcessamentoList[0];
                     
                     XmlNodeList dhProcessamentoList = dadosProcessamento.GetElementsByTagName("dhProcessamento");
-                    if (dhProcessamentoList.Count > 0 && DateTime.TryParse(dhProcessamentoList[0].InnerText.Trim(), out DateTime dtProcessamento))
+                    if (dhProcessamentoList.Count > 0 && DateTime.TryParse(dhProcessamentoList[0].InnerText.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dtProcessamento))
                     {
                         resposta.DataProcessamento = dtProcessamento;
                     }
@@ -248,13 +256,13 @@ namespace ExemploAssinadorXML.Services
                             }
                             
                             XmlNodeList dhRecepcaoEventoList = dadosRecepcaoEvento.GetElementsByTagName("dhRecepcao");
-                            if (dhRecepcaoEventoList.Count > 0 && DateTime.TryParse(dhRecepcaoEventoList[0].InnerText.Trim(), out DateTime dtRecepcaoEvento))
+                            if (dhRecepcaoEventoList.Count > 0 && DateTime.TryParse(dhRecepcaoEventoList[0].InnerText.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dtRecepcaoEvento))
                             {
                                 detalheEvento.DataRecepcao = dtRecepcaoEvento;
                             }
                             
                             XmlNodeList dhProcessamentoEventoList = dadosRecepcaoEvento.GetElementsByTagName("dhProcessamento");
-                            if (dhProcessamentoEventoList.Count > 0 && DateTime.TryParse(dhProcessamentoEventoList[0].InnerText.Trim(), out DateTime dtProcessamentoEvento))
+                            if (dhProcessamentoEventoList.Count > 0 && DateTime.TryParse(dhProcessamentoEventoList[0].InnerText.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dtProcessamentoEvento))
                             {
                                 detalheEvento.DataProcessamento = dtProcessamentoEvento;
                             }

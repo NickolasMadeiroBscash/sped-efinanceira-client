@@ -5,13 +5,13 @@
     <CertThumbprint>6A85397E2E7E6AF601418C24736155AF70FE8D02</CertThumbprint>
     <CertServidorThumbprint>cc242988a739caa7757b29e2a900ae35519cdb39</CertServidorThumbprint>
     <Ambiente>TEST</Ambiente>
-    <TestEnvioHabilitado>false</TestEnvioHabilitado>
+    <TestEnvioHabilitado>true</TestEnvioHabilitado>
     <ModoTeste>true</ModoTeste>
-    <Periodo>202601</Periodo>
+    <Periodo>202301</Periodo>
     <DiretorioLotes>C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\bin\Debug\lotes</DiretorioLotes>
     <PageSize>1</PageSize>
     <EventoOffset>0</EventoOffset>
-    <OffsetRegistros>1</OffsetRegistros>
+    <OffsetRegistros>4</OffsetRegistros>
     <MaxLotes>1</MaxLotes>
     <EventosPorLote>1</EventosPorLote>
     <UrlTeste>https://pre-efinanceira.receita.fazenda.gov.br/recepcao/lotes/cripto</UrlTeste>
@@ -21,8 +21,8 @@
   </Config>
   <DadosAbertura>
     <CnpjDeclarante>40994589000105</CnpjDeclarante>
-    <DtInicio>2026-01-01</DtInicio>
-    <DtFim>2026-06-30</DtFim>
+    <DtInicio>2023-01-01</DtInicio>
+    <DtFim>2023-06-30</DtFim>
     <TipoAmbiente>2</TipoAmbiente>
     <AplicacaoEmissora>1</AplicacaoEmissora>
     <IndRetificacao>1</IndRetificacao>
@@ -70,8 +70,8 @@
   </DadosAbertura>
   <DadosFechamento>
     <CnpjDeclarante>40994589000105</CnpjDeclarante>
-    <DtInicio>2026-01-01</DtInicio>
-    <DtFim>2026-06-30</DtFim>
+    <DtInicio>2023-01-01</DtInicio>
+    <DtFim>2023-06-30</DtFim>
     <TipoAmbiente>2</TipoAmbiente>
     <AplicacaoEmissora>1</AplicacaoEmissora>
     <IndRetificacao>1</IndRetificacao>
@@ -82,5 +82,25 @@
     <FechamentoMovOpFinAnual xsi:nil="true" />
     <ContasAReportarEntDecExterior xsi:nil="true" />
   </DadosFechamento>
-  <DataSalvamento>2026-01-30T13:44:25.6765743-03:00</DataSalvamento>
+  <DadosCadastroDeclarante>
+    <CnpjDeclarante>40994589000105</CnpjDeclarante>
+    <TipoAmbiente>2</TipoAmbiente>
+    <AplicacaoEmissora>1</AplicacaoEmissora>
+    <IndRetificacao>1</IndRetificacao>
+    <NrRecibo />
+    <CategoriaDeclarante>FATCA602</CategoriaDeclarante>
+    <TiposInstPgto />
+    <NIFs />
+    <Nome>BS INSTITUICAO DE PAGAMENTO S.A</Nome>
+    <EnderecoLivre>Av DESEMBARGADOR MOREIRA, 1300, SALA 1307, T. SUL, ALDEOTA</EnderecoLivre>
+    <Municipio>2304400</Municipio>
+    <UF>CE</UF>
+    <CEP>60170020</CEP>
+    <Pais>BR</Pais>
+    <PaisResid>
+      <string>BR</string>
+    </PaisResid>
+    <EnderecosOutros />
+  </DadosCadastroDeclarante>
+  <DataSalvamento>2026-02-02T15:20:19.522561-03:00</DataSalvamento>
 </ConfiguracaoCompleta>

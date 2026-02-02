@@ -13,10 +13,42 @@ namespace ExemploAssinadorXML.Forms
 {
     public partial class ProcessamentoForm : Form
     {
+        // Constantes para strings repetidas
+        private const string PROTOCOLO_ENVIO = "protocoloEnvio";
+        private const string NUMERO_PROTOCOLO = "numeroProtocolo";
+        private const string PROTOCOLO_XPATH = "//protocoloEnvio";
+        private const string PROTOCOLO_NS_XPATH = "//ns:protocoloEnvio";
+        private const string PROTOCOLO_SIMPLE_XPATH = "//protocolo";
+        private const string PROTOCOLO_NS_SIMPLE_XPATH = "//ns:protocolo";
+        private const string NAMESPACE_ENVIO_LOTE = "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0";
+        private const string SUFIXO_ASSINADO = "-ASSINADO.xml";
+        private const string STATUS_ASSINADO = "ASSINADO";
+        private const string STATUS_ASSINATURA = "ASSINATURA";
+        private const string STATUS_CRIPTOGRAFADO = "CRIPTOGRAFADO";
+        private const string STATUS_CRIPTOGRAFIA = "CRIPTOGRAFIA";
+        private const string STATUS_ENVIADO = "ENVIADO";
+        private const string STATUS_REJEITADO = "REJEITADO";
+        private const string STATUS_ENVIO = "ENVIO";
+        private const string AMBIENTE_HOMOLOG = "HOMOLOG";
+        private const string LOG_GERACAO = "GERACAO";
+        private const string CAMPO_PREFIXO = "Campo:";
+        private const string TITULO_CAMPOS_FALTANDO = "Campos Obrigatórios Faltando";
+        private const string MSG_ACESSE_CONFIG = "Acesse a aba 'Configuração' e preencha todos os campos obrigatórios";
+        private const string MSG_CAMPO_CNPJ = "Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'";
+        private const string MSG_CAMPO_CERT_ASSINATURA = "Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'";
+        private const string MSG_CAMPO_CERT_SERVIDOR = "Campo: 'Certificado do Servidor' na seção 'Configuração Geral'";
+        private const string MSG_CAMPO_PERIODO = "Campo: 'Período' na seção 'Configuração Geral'";
+        private const string MSG_CAMPO_DIRETORIO = "Campo: 'Diretório de Lotes' na seção 'Configuração Geral'";
+        private const string MSG_CONFIG_NAO_INICIALIZADA = "Configuração geral não foi inicializada. Preencha os seguintes campos:";
+        private const string MSG_CAMPOS_FALTANDO = "Os seguintes campos obrigatórios estão faltando:\n\n";
+        
+        // Constante para formato de data
+        private static readonly System.Globalization.CultureInfo CULTURE_INFO_PT_BR = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
         private GroupBox grpControles;
         private Button btnProcessarAbertura;
         private Button btnProcessarMovimentacao;
         private Button btnProcessarFechamento;
+        private Button btnProcessarCadastroDeclarante;
         private Button btnCancelar;
         private CheckBox chkApenasProcessar;
 
@@ -37,7 +69,7 @@ namespace ExemploAssinadorXML.Forms
         private Label lblTempoDecorrido;
         private Label lblTempoEstimado;
 
-        private StatusProcessamento status;
+        private readonly StatusProcessamento status;
         private bool cancelarProcessamento = false;
 
         public ConfiguracaoForm ConfigForm { get; set; }
@@ -49,6 +81,84 @@ namespace ExemploAssinadorXML.Forms
             status = new StatusProcessamento();
         }
 
+        /// <summary>
+        /// Extrai o protocolo da resposta do envio, tentando múltiplas estratégias
+        /// </summary>
+        private string ExtrairProtocolo(RespostaEnvioEfinanceira resposta)
+        {
+            string protocolo = resposta.Protocolo;
+
+            // Se já veio no objeto resposta, retornar
+            if (!string.IsNullOrEmpty(protocolo))
+            {
+                return protocolo;
+            }
+
+            // Se não veio no objeto resposta, tentar extrair do XML
+            if (string.IsNullOrEmpty(resposta.XmlCompleto))
+            {
+                return null;
+            }
+
+            try
+            {
+                System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
+                doc.LoadXml(resposta.XmlCompleto);
+
+                // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
+                System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName(PROTOCOLO_ENVIO);
+                if (protocoloList != null && protocoloList.Count > 0)
+                {
+                    protocolo = protocoloList[0].InnerText.Trim();
+                    if (!string.IsNullOrEmpty(protocolo))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Protocolo encontrado via GetElementsByTagName: {protocolo}");
+                        return protocolo;
+                    }
+                }
+
+                // Tentar com XPath (com namespace)
+                System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
+                nsmgr.AddNamespace("ns", NAMESPACE_ENVIO_LOTE);
+
+                System.Xml.XmlNode protocoloNode = doc.SelectSingleNode(PROTOCOLO_XPATH)
+                    ?? doc.SelectSingleNode(PROTOCOLO_NS_XPATH, nsmgr)
+                    ?? doc.SelectSingleNode(PROTOCOLO_SIMPLE_XPATH)
+                    ?? doc.SelectSingleNode(PROTOCOLO_NS_SIMPLE_XPATH, nsmgr);
+
+                if (protocoloNode != null)
+                {
+                    protocolo = protocoloNode.InnerText.Trim();
+                    if (!string.IsNullOrEmpty(protocolo))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Protocolo encontrado via XPath: {protocolo}");
+                        return protocolo;
+                    }
+                }
+
+                // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
+                System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName(NUMERO_PROTOCOLO);
+                if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
+                {
+                    protocolo = numeroProtocoloList[0].InnerText.Trim();
+                    if (!string.IsNullOrEmpty(protocolo))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Protocolo encontrado via numeroProtocolo: {protocolo}");
+                        return protocolo;
+                    }
+                }
+
+                System.Diagnostics.Debug.WriteLine("AVISO: Protocolo não encontrado no XML de resposta.");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Erro ao extrair protocolo do XML: {ex.Message}");
+                AdicionarLog($"⚠ Erro ao extrair protocolo do XML: {ex.Message}");
+            }
+
+            return null;
+        }
+
         private void InitializeComponent()
         {
             this.SuspendLayout();
@@ -57,7 +167,7 @@ namespace ExemploAssinadorXML.Forms
             grpControles = new GroupBox();
             grpControles.Text = "Controles";
             grpControles.Location = new Point(10, 10);
-            grpControles.Size = new Size(750, 80);
+            grpControles.Size = new Size(900, 80);
             grpControles.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             btnProcessarAbertura = new Button();
@@ -78,22 +188,28 @@ namespace ExemploAssinadorXML.Forms
             btnProcessarFechamento.Size = new Size(150, 35);
             btnProcessarFechamento.Click += BtnProcessarFechamento_Click;
 
+            btnProcessarCadastroDeclarante = new Button();
+            btnProcessarCadastroDeclarante.Text = "Processar Cadastro";
+            btnProcessarCadastroDeclarante.Location = new Point(490, 25);
+            btnProcessarCadastroDeclarante.Size = new Size(150, 35);
+            btnProcessarCadastroDeclarante.Click += BtnProcessarCadastroDeclarante_Click;
+
             btnCancelar = new Button();
             btnCancelar.Text = "Cancelar";
-            btnCancelar.Location = new Point(490, 25);
+            btnCancelar.Location = new Point(650, 25);
             btnCancelar.Size = new Size(100, 35);
             btnCancelar.Enabled = false;
             btnCancelar.Click += BtnCancelar_Click;
 
             chkApenasProcessar = new CheckBox();
             chkApenasProcessar.Text = "Apenas Processar (não enviar)";
-            chkApenasProcessar.Location = new Point(600, 32);
+            chkApenasProcessar.Location = new Point(760, 32);
             chkApenasProcessar.Size = new Size(200, 20);
             chkApenasProcessar.Checked = false;
 
             grpControles.Controls.AddRange(new Control[] {
                 btnProcessarAbertura, btnProcessarMovimentacao, btnProcessarFechamento,
-                btnCancelar, chkApenasProcessar
+                btnProcessarCadastroDeclarante, btnCancelar, chkApenasProcessar
             });
 
             // Progresso
@@ -200,17 +316,18 @@ namespace ExemploAssinadorXML.Forms
             string erro = ValidarDadosAbertura();
             if (!string.IsNullOrEmpty(erro))
             {
-                string mensagemFinal = erro.Contains("Campo:") || erro.Contains("Aba") 
-                    ? $"Não é possível processar o evento de Abertura.\n\nOs seguintes campos obrigatórios estão faltando:\n\n{erro}\n\nPor favor, preencha os campos indicados acima na aba Configuração."
+                string mensagemFinal = erro.Contains(CAMPO_PREFIXO) || erro.Contains("Aba") 
+                    ? $"Não é possível processar o evento de Abertura.\n\n{MSG_CAMPOS_FALTANDO}{erro}\n\nPor favor, preencha os campos indicados acima na aba Configuração."
                     : $"Não é possível processar o evento de Abertura.\n\n{erro}";
                 MessageBox.Show(mensagemFinal, 
-                    "Campos Obrigatórios Faltando", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    TITULO_CAMPOS_FALTANDO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             btnProcessarAbertura.Enabled = false;
             btnProcessarMovimentacao.Enabled = false;
             btnProcessarFechamento.Enabled = false;
+            btnProcessarCadastroDeclarante.Enabled = false;
             btnCancelar.Enabled = true;
             cancelarProcessamento = false;
 
@@ -222,17 +339,18 @@ namespace ExemploAssinadorXML.Forms
             string erro = ValidarDadosMovimentacao();
             if (!string.IsNullOrEmpty(erro))
             {
-                string mensagemFinal = erro.Contains("Campo:") || erro.Contains("Aba") 
-                    ? $"Não é possível processar o evento de Movimentação.\n\nOs seguintes campos obrigatórios estão faltando:\n\n{erro}\n\nPor favor, preencha os campos indicados acima na aba Configuração."
+                string mensagemFinal = erro.Contains(CAMPO_PREFIXO) || erro.Contains("Aba") 
+                    ? $"Não é possível processar o evento de Movimentação.\n\n{MSG_CAMPOS_FALTANDO}{erro}\n\nPor favor, preencha os campos indicados acima na aba Configuração."
                     : $"Não é possível processar o evento de Movimentação.\n\n{erro}";
                 MessageBox.Show(mensagemFinal, 
-                    "Campos Obrigatórios Faltando", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    TITULO_CAMPOS_FALTANDO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             btnProcessarAbertura.Enabled = false;
             btnProcessarMovimentacao.Enabled = false;
             btnProcessarFechamento.Enabled = false;
+            btnProcessarCadastroDeclarante.Enabled = false;
             btnCancelar.Enabled = true;
             cancelarProcessamento = false;
 
@@ -244,21 +362,45 @@ namespace ExemploAssinadorXML.Forms
             string erro = ValidarDadosFechamento();
             if (!string.IsNullOrEmpty(erro))
             {
-                string mensagemFinal = erro.Contains("Campo:") || erro.Contains("Aba") 
-                    ? $"Não é possível processar o evento de Fechamento.\n\nOs seguintes campos obrigatórios estão faltando:\n\n{erro}\n\nPor favor, preencha os campos indicados acima na aba Configuração."
+                string mensagemFinal = erro.Contains(CAMPO_PREFIXO) || erro.Contains("Aba") 
+                    ? $"Não é possível processar o evento de Fechamento.\n\n{MSG_CAMPOS_FALTANDO}{erro}\n\nPor favor, preencha os campos indicados acima na aba Configuração."
                     : $"Não é possível processar o evento de Fechamento.\n\n{erro}";
                 MessageBox.Show(mensagemFinal, 
-                    "Campos Obrigatórios Faltando", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    TITULO_CAMPOS_FALTANDO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             btnProcessarAbertura.Enabled = false;
             btnProcessarMovimentacao.Enabled = false;
             btnProcessarFechamento.Enabled = false;
+            btnProcessarCadastroDeclarante.Enabled = false;
             btnCancelar.Enabled = true;
             cancelarProcessamento = false;
 
             Task.Run(() => ProcessarFechamento());
+        }
+
+        private void BtnProcessarCadastroDeclarante_Click(object sender, EventArgs e)
+        {
+            string erro = ValidarDadosCadastroDeclarante();
+            if (!string.IsNullOrEmpty(erro))
+            {
+                string mensagemFinal = erro.Contains(CAMPO_PREFIXO) || erro.Contains("Aba") 
+                    ? $"Não é possível processar o evento de Cadastro de Declarante.\n\n{MSG_CAMPOS_FALTANDO}{erro}\n\nPor favor, preencha os campos indicados acima na aba Configuração."
+                    : $"Não é possível processar o evento de Cadastro de Declarante.\n\n{erro}";
+                MessageBox.Show(mensagemFinal, 
+                    TITULO_CAMPOS_FALTANDO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            btnProcessarAbertura.Enabled = false;
+            btnProcessarMovimentacao.Enabled = false;
+            btnProcessarFechamento.Enabled = false;
+            btnProcessarCadastroDeclarante.Enabled = false;
+            btnCancelar.Enabled = true;
+            cancelarProcessamento = false;
+
+            Task.Run(() => ProcessarCadastroDeclarante());
         }
 
         private void BtnCancelar_Click(object sender, EventArgs e)
@@ -273,24 +415,24 @@ namespace ExemploAssinadorXML.Forms
 
             if (ConfigForm == null)
             {
-                camposFaltando.Add("Acesse a aba 'Configuração' e preencha todos os campos obrigatórios");
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_ACESSE_CONFIG);
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
                 camposFaltando.Add("Aba 'Dados de Abertura': Preencha todos os campos obrigatórios");
                 return string.Join("\n", camposFaltando);
             }
 
             if (ConfigForm.Config == null)
             {
-                camposFaltando.Add("Configuração geral não foi inicializada. Preencha os seguintes campos:");
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CONFIG_NAO_INICIALIZADA);
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
                 return string.Join("\n", camposFaltando);
             }
 
@@ -310,19 +452,19 @@ namespace ExemploAssinadorXML.Forms
 
             // Validações gerais
             if (string.IsNullOrWhiteSpace(config.CnpjDeclarante))
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
 
             if (string.IsNullOrWhiteSpace(config.CertThumbprint))
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
 
             if (string.IsNullOrWhiteSpace(config.CertServidorThumbprint))
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
 
             if (string.IsNullOrWhiteSpace(config.Periodo))
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
 
             if (string.IsNullOrWhiteSpace(config.DiretorioLotes))
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
 
             // Validações específicas de abertura
             if (string.IsNullOrWhiteSpace(dadosAbertura.DtInicio))
@@ -450,7 +592,7 @@ namespace ExemploAssinadorXML.Forms
 
             if (camposFaltando.Count > 0)
             {
-                return "Os seguintes campos obrigatórios estão faltando:\n\n" + string.Join("\n", camposFaltando);
+                return MSG_CAMPOS_FALTANDO + string.Join("\n", camposFaltando);
             }
 
             return null;
@@ -462,24 +604,24 @@ namespace ExemploAssinadorXML.Forms
 
             if (ConfigForm == null)
             {
-                camposFaltando.Add("Acesse a aba 'Configuração' e preencha todos os campos obrigatórios");
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_ACESSE_CONFIG);
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
                 camposFaltando.Add("Campo: 'Page Size' na seção 'Configuração de Processamento'");
                 return string.Join("\n", camposFaltando);
             }
 
             if (ConfigForm.Config == null)
             {
-                camposFaltando.Add("Configuração geral não foi inicializada. Preencha os seguintes campos:");
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CONFIG_NAO_INICIALIZADA);
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
                 camposFaltando.Add("Campo: 'Page Size' na seção 'Configuração de Processamento'");
                 return string.Join("\n", camposFaltando);
             }
@@ -488,26 +630,26 @@ namespace ExemploAssinadorXML.Forms
 
             // Validações gerais obrigatórias para movimentação
             if (string.IsNullOrWhiteSpace(config.CnpjDeclarante))
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
 
             if (string.IsNullOrWhiteSpace(config.CertThumbprint))
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
 
             if (string.IsNullOrWhiteSpace(config.CertServidorThumbprint))
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
 
             if (string.IsNullOrWhiteSpace(config.Periodo))
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
 
             if (string.IsNullOrWhiteSpace(config.DiretorioLotes))
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
 
             if (config.PageSize <= 0)
                 camposFaltando.Add("Campo: 'Page Size' na seção 'Configuração de Processamento' (deve ser maior que zero)");
 
             if (camposFaltando.Count > 0)
             {
-                return "Os seguintes campos obrigatórios estão faltando:\n\n" + string.Join("\n", camposFaltando);
+                return MSG_CAMPOS_FALTANDO + string.Join("\n", camposFaltando);
             }
 
             return null;
@@ -519,12 +661,12 @@ namespace ExemploAssinadorXML.Forms
 
             if (ConfigForm == null)
             {
-                camposFaltando.Add("Acesse a aba 'Configuração' e preencha todos os campos obrigatórios");
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_ACESSE_CONFIG);
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
                 camposFaltando.Add("Aba 'Dados de Fechamento': Preencha 'Data de Início'");
                 camposFaltando.Add("Aba 'Dados de Fechamento': Preencha 'Data de Fim'");
                 return string.Join("\n", camposFaltando);
@@ -532,12 +674,12 @@ namespace ExemploAssinadorXML.Forms
 
             if (ConfigForm.Config == null)
             {
-                camposFaltando.Add("Configuração geral não foi inicializada. Preencha os seguintes campos:");
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CONFIG_NAO_INICIALIZADA);
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
                 return string.Join("\n", camposFaltando);
             }
 
@@ -554,19 +696,19 @@ namespace ExemploAssinadorXML.Forms
 
             // Validações gerais
             if (string.IsNullOrWhiteSpace(config.CnpjDeclarante))
-                camposFaltando.Add("Campo: 'CNPJ do Declarante' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
 
             if (string.IsNullOrWhiteSpace(config.CertThumbprint))
-                camposFaltando.Add("Campo: 'Certificado para Assinatura' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
 
             if (string.IsNullOrWhiteSpace(config.CertServidorThumbprint))
-                camposFaltando.Add("Campo: 'Certificado do Servidor' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
 
             if (string.IsNullOrWhiteSpace(config.Periodo))
-                camposFaltando.Add("Campo: 'Período' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_PERIODO);
 
             if (string.IsNullOrWhiteSpace(config.DiretorioLotes))
-                camposFaltando.Add("Campo: 'Diretório de Lotes' na seção 'Configuração Geral'");
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
 
             // Validações específicas de fechamento
             if (string.IsNullOrWhiteSpace(dadosFechamento.DtInicio))
@@ -577,7 +719,90 @@ namespace ExemploAssinadorXML.Forms
 
             if (camposFaltando.Count > 0)
             {
-                return "Os seguintes campos obrigatórios estão faltando:\n\n" + string.Join("\n", camposFaltando);
+                return MSG_CAMPOS_FALTANDO + string.Join("\n", camposFaltando);
+            }
+
+            return null;
+        }
+
+        private string ValidarDadosCadastroDeclarante()
+        {
+            List<string> camposFaltando = new List<string>();
+
+            if (ConfigForm == null)
+            {
+                camposFaltando.Add("Acesse a aba 'Configuração' e preencha todos os campos obrigatórios");
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'Nome (Razão Social)'");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'Endereço Livre'");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'Município'");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'UF'");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'CEP'");
+                return string.Join("\n", camposFaltando);
+            }
+
+            if (ConfigForm.Config == null)
+            {
+                camposFaltando.Add("Configuração geral não foi inicializada. Preencha os seguintes campos:");
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
+                return string.Join("\n", camposFaltando);
+            }
+
+            var config = ConfigForm.Config;
+            var dadosCadastro = ConfigForm.DadosCadastroDeclarante;
+
+            if (dadosCadastro == null)
+            {
+                camposFaltando.Add("Dados de cadastro de declarante não foram configurados. Preencha os seguintes campos:");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'Nome (Razão Social)'");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'Endereço Livre'");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'Município'");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'UF'");
+                camposFaltando.Add("Aba 'Cadastro Declarante': Preencha 'CEP'");
+                return string.Join("\n", camposFaltando);
+            }
+
+            // Validações gerais
+            if (string.IsNullOrWhiteSpace(config.CnpjDeclarante))
+                camposFaltando.Add(MSG_CAMPO_CNPJ);
+
+            if (string.IsNullOrWhiteSpace(config.CertThumbprint))
+                camposFaltando.Add(MSG_CAMPO_CERT_ASSINATURA);
+
+            if (string.IsNullOrWhiteSpace(config.CertServidorThumbprint))
+                camposFaltando.Add(MSG_CAMPO_CERT_SERVIDOR);
+
+            if (string.IsNullOrWhiteSpace(config.DiretorioLotes))
+                camposFaltando.Add(MSG_CAMPO_DIRETORIO);
+
+            // Validações específicas de cadastro de declarante
+            if (string.IsNullOrWhiteSpace(dadosCadastro.Nome))
+                camposFaltando.Add("Campo: 'Nome (Razão Social)' na aba 'Cadastro Declarante'");
+
+            if (string.IsNullOrWhiteSpace(dadosCadastro.EnderecoLivre))
+                camposFaltando.Add("Campo: 'Endereço Livre' na aba 'Cadastro Declarante'");
+
+            if (string.IsNullOrWhiteSpace(dadosCadastro.Municipio))
+                camposFaltando.Add("Campo: 'Município (Código IBGE)' na aba 'Cadastro Declarante'");
+
+            if (string.IsNullOrWhiteSpace(dadosCadastro.UF))
+                camposFaltando.Add("Campo: 'UF' na aba 'Cadastro Declarante'");
+
+            if (string.IsNullOrWhiteSpace(dadosCadastro.CEP))
+                camposFaltando.Add("Campo: 'CEP' na aba 'Cadastro Declarante'");
+
+            if (dadosCadastro.PaisResid == null || dadosCadastro.PaisResid.Count == 0 || !dadosCadastro.PaisResid.Contains("BR"))
+                camposFaltando.Add("Campo: 'País Residência Fiscal' na aba 'Cadastro Declarante' (deve conter 'BR')");
+
+            if (camposFaltando.Count > 0)
+            {
+                return MSG_CAMPOS_FALTANDO + string.Join("\n", camposFaltando);
             }
 
             return null;
@@ -609,7 +834,7 @@ namespace ExemploAssinadorXML.Forms
                 try
                 {
                     var persistenceService = new EfinanceiraDatabasePersistenceService();
-                    string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : "HOMOLOG";
+                    string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : AMBIENTE_HOMOLOG;
                     idLoteBanco = persistenceService.RegistrarLote(
                         TipoLote.Abertura,
                         config.Periodo,
@@ -620,7 +845,7 @@ namespace ExemploAssinadorXML.Forms
                         null, // Ainda não criptografado
                         ambienteStr
                     );
-                    persistenceService.RegistrarLogLote(idLoteBanco, "GERACAO", $"XML gerado: {Path.GetFileName(arquivoXml)}");
+                    persistenceService.RegistrarLogLote(idLoteBanco, LOG_GERACAO, $"XML gerado: {Path.GetFileName(arquivoXml)}");
                     AdicionarLog($"Lote registrado no banco (ID: {idLoteBanco}).");
                 }
                 catch (Exception exDb)
@@ -640,7 +865,7 @@ namespace ExemploAssinadorXML.Forms
                 var assinaturaService = new EfinanceiraAssinaturaService();
                 X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
                 var xmlAssinado = assinaturaService.AssinarEventosDoArquivo(arquivoXml, cert);
-                string arquivoAssinado = arquivoXml.Replace(".xml", "-ASSINADO.xml");
+                string arquivoAssinado = arquivoXml.Replace(".xml", SUFIXO_ASSINADO);
                 xmlAssinado.Save(arquivoAssinado);
                 status.LotesAssinados = 1;
                 AtualizarEstatisticas();
@@ -652,8 +877,8 @@ namespace ExemploAssinadorXML.Forms
                     try
                     {
                         var persistenceService = new EfinanceiraDatabasePersistenceService();
-                        persistenceService.AtualizarLote(idLoteBanco, "ASSINADO");
-                        persistenceService.RegistrarLogLote(idLoteBanco, "ASSINATURA", $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                        persistenceService.AtualizarLote(idLoteBanco, STATUS_ASSINADO);
+                        persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ASSINATURA, $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
                     }
                     catch (Exception exDb)
                     {
@@ -677,8 +902,8 @@ namespace ExemploAssinadorXML.Forms
                     try
                     {
                         var persistenceService = new EfinanceiraDatabasePersistenceService();
-                        persistenceService.AtualizarLote(idLoteBanco, "CRIPTOGRAFADO");
-                        persistenceService.RegistrarLogLote(idLoteBanco, "CRIPTOGRAFIA", $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
+                        persistenceService.AtualizarLote(idLoteBanco, STATUS_CRIPTOGRAFADO);
+                        persistenceService.RegistrarLogLote(idLoteBanco, STATUS_CRIPTOGRAFIA, $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
                     }
                     catch (Exception exDb)
                     {
@@ -718,220 +943,24 @@ namespace ExemploAssinadorXML.Forms
                         status.LotesEnviados = 1;
                         AtualizarEstatisticas();
                         
+                        // SEMPRE tentar extrair o protocolo, independentemente do código de resposta
+                        string protocoloFinal = ExtrairProtocolo(resposta);
+                        
+                        // Determinar status e mensagem baseado no código de resposta
+                        string statusLote = "ENVIADO_COM_RESPOSTA";
+                        string mensagemStatus = "";
+                        
                         if (resposta.CodigoResposta == 1)
                         {
-                            // Garantir que o protocolo foi extraído (pode não ter vindo no objeto resposta)
-                            string protocoloFinal = resposta.Protocolo;
-                            
-                            // Se não veio no objeto resposta, tentar extrair do XML
-                            if (string.IsNullOrEmpty(protocoloFinal) && !string.IsNullOrEmpty(resposta.XmlCompleto))
-                            {
-                                try
-                                {
-                                    System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
-                                    doc.LoadXml(resposta.XmlCompleto);
-                                    
-                                    // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
-                                    System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
-                                    if (protocoloList != null && protocoloList.Count > 0)
-                                    {
-                                        protocoloFinal = protocoloList[0].InnerText.Trim();
-                                    }
-                                    else
-                                    {
-                                        // Tentar com XPath (com namespace)
-                                        System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
-                                        nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
-                                        
-                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
-                                            ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
-                                            ?? doc.SelectSingleNode("//protocolo")
-                                            ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
-                                        
-                                        if (protocoloNode != null)
-                                        {
-                                            protocoloFinal = protocoloNode.InnerText.Trim();
-                                        }
-                                        else
-                                        {
-                                            // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
-                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
-                                            if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
-                                            {
-                                                protocoloFinal = numeroProtocoloList[0].InnerText.Trim();
-                                            }
-                                        }
-                                    }
-                                    
-                                    if (!string.IsNullOrEmpty(protocoloFinal))
-                                    {
-                                        resposta.Protocolo = protocoloFinal; // Atualizar no objeto resposta também
-                                        AdicionarLog($"✓ Protocolo extraído do XML: {protocoloFinal}");
-                                    }
-                                }
-                                catch (Exception exXml)
-                                {
-                                    AdicionarLog($"⚠ Erro ao extrair protocolo do XML: {exXml.Message}");
-                                }
-                            }
-                            
-                            // AGUARDAR PROTOCOLO - Não finalizar sem protocolo
-                            if (!string.IsNullOrEmpty(protocoloFinal))
-                            {
-                                // Adicionar protocolo à lista
-                                if (!status.ProtocolosEnviados.Contains(protocoloFinal))
-                                {
-                                    status.ProtocolosEnviados.Add(protocoloFinal);
-                                }
-                                
-                                AdicionarLog($"✓ Lote de abertura enviado com sucesso! Protocolo: {protocoloFinal}");
-                                AdicionarLog($"════════════════════════════════════════");
-                                AdicionarLog($"PROTOCOLO DO LOTE DE ABERTURA:");
-                                AdicionarLog($"{protocoloFinal}");
-                                AdicionarLog($"════════════════════════════════════════");
-                                
-                                // Atualizar lote no banco após envio
-                                if (idLoteBanco > 0)
-                                {
-                                    try
-                                    {
-                                        var persistenceService = new EfinanceiraDatabasePersistenceService();
-                                        string xmlResposta = resposta.XmlCompleto ?? "";
-                                        persistenceService.AtualizarLote(
-                                            idLoteBanco,
-                                            "ENVIADO",
-                                            protocoloFinal,
-                                            resposta.CodigoResposta,
-                                            resposta.Descricao,
-                                            xmlResposta,
-                                            null,
-                                            null,
-                                            null,
-                                            DateTime.Now,
-                                            null,
-                                            null
-                                        );
-                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
-                                    }
-                                    catch (Exception exDb)
-                                    {
-                                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após envio: {exDb.Message}");
-                                    }
-                                }
-                                
-                                // Atualizar protocolo no lote já registrado (sistema antigo)
-                                ProtocoloPersistenciaService.RegistrarProtocolo(
-                                    TipoLote.Abertura, 
-                                    arquivoCriptografado, 
-                                    protocoloFinal,
-                                    config.Periodo,
-                                    quantidadeEventos
-                                );
-                                
-                                // Aguardar um momento para garantir que o protocolo foi salvo
-                                System.Threading.Thread.Sleep(500);
-                                
-                                // Atualizar lista na aba Consulta com o protocolo já preenchido
-                                if (ConsultaForm != null)
-                                {
-                                    this.Invoke((MethodInvoker)delegate
-                                    {
-                                        ConsultaForm.AtualizarListaLotes();
-                                    });
-                                }
-                                
-                                // Exibir MessageBox destacando o protocolo
-                                MessageBox.Show(
-                                    $"Lote de abertura enviado com sucesso!\n\n" +
-                                    $"PROTOCOLO: {protocoloFinal}\n\n" +
-                                    $"Este protocolo foi salvo e pode ser consultado na aba 'Consulta'.",
-                                    "Envio Concluído",
-                                    MessageBoxButtons.OK,
-                                    MessageBoxIcon.Information
-                                );
-                                
-                                AtualizarEstatisticas();
-                            }
-                            else
-                            {
-                                // Se não recebeu protocolo, aguardar e tentar novamente ou informar erro
-                                AdicionarLog($"⚠ ATENÇÃO: Lote enviado mas protocolo não foi retornado!");
-                                AdicionarLog($"  Aguardando resposta do servidor...");
-                                
-                                // Tentar aguardar um pouco mais e verificar se há protocolo na resposta XML
-                                System.Threading.Thread.Sleep(2000);
-                                
-                                // Se ainda não tiver protocolo, registrar como erro
-                                if (idLoteBanco > 0)
-                                {
-                                    try
-                                    {
-                                        var persistenceService = new EfinanceiraDatabasePersistenceService();
-                                        persistenceService.AtualizarLote(
-                                            idLoteBanco,
-                                            "ENVIADO_SEM_PROTOCOLO",
-                                            null,
-                                            resposta.CodigoResposta,
-                                            resposta.Descricao + " (Protocolo não retornado)",
-                                            resposta.XmlCompleto ?? "",
-                                            null,
-                                            null,
-                                            null,
-                                            DateTime.Now,
-                                            null,
-                                            "Protocolo não retornado pelo servidor"
-                                        );
-                                    }
-                                    catch (Exception exDb)
-                                    {
-                                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
-                                    }
-                                }
-                                
-                                MessageBox.Show(
-                                    $"Lote enviado, mas o protocolo não foi retornado pelo servidor.\n\n" +
-                                    $"Código de Resposta: {resposta.CodigoResposta}\n" +
-                                    $"Descrição: {resposta.Descricao}\n\n" +
-                                    $"Verifique o XML de resposta ou consulte o lote mais tarde.",
-                                    "Aviso - Protocolo Não Recebido",
-                                    MessageBoxButtons.OK,
-                                    MessageBoxIcon.Warning
-                                );
-                            }
+                            statusLote = STATUS_ENVIADO;
+                            mensagemStatus = "Lote enviado com sucesso";
                         }
                         else if (resposta.CodigoResposta == 7)
                         {
+                            statusLote = STATUS_REJEITADO;
+                            mensagemStatus = "Lote REJEITADO";
                             AdicionarLog($"✗ Lote de abertura REJEITADO - Código: {resposta.CodigoResposta}");
                             AdicionarLog($"  Descrição: {resposta.Descricao}");
-                            
-                            // Atualizar lote no banco com erro
-                            if (idLoteBanco > 0)
-                            {
-                                try
-                                {
-                                    var persistenceService = new EfinanceiraDatabasePersistenceService();
-                                    string erroMsg = $"REJEITADO - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}";
-                                    persistenceService.AtualizarLote(
-                                        idLoteBanco,
-                                        "REJEITADO",
-                                        null,
-                                        resposta.CodigoResposta,
-                                        resposta.Descricao,
-                                        resposta.XmlCompleto ?? "",
-                                        null,
-                                        null,
-                                        null,
-                                        DateTime.Now,
-                                        null,
-                                        erroMsg
-                                    );
-                                    persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO_ERRO", erroMsg);
-                                }
-                                catch (Exception exDb)
-                                {
-                                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após rejeição: {exDb.Message}");
-                                }
-                            }
                             
                             if (resposta.Ocorrencias != null && resposta.Ocorrencias.Count > 0)
                             {
@@ -943,128 +972,125 @@ namespace ExemploAssinadorXML.Forms
                         }
                         else
                         {
-                            // SEMPRE tentar extrair e salvar o protocolo, mesmo se código não for 1
-                            string protocoloExtraido = resposta.Protocolo;
+                            AdicionarLog($"⚠ Lote de abertura - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                        }
+                        
+                        // Se não encontrou protocolo, aguardar um pouco e tentar novamente
+                        if (string.IsNullOrEmpty(protocoloFinal))
+                        {
+                            AdicionarLog($"⚠ Aguardando resposta do servidor para obter protocolo...");
+                            System.Threading.Thread.Sleep(2000);
+                            protocoloFinal = ExtrairProtocolo(resposta);
                             
-                            // Se não veio no objeto resposta, tentar extrair do XML (seguindo lógica do Java)
-                            if (string.IsNullOrEmpty(protocoloExtraido) && !string.IsNullOrEmpty(resposta.XmlCompleto))
+                            if (string.IsNullOrEmpty(protocoloFinal))
                             {
-                                try
-                                {
-                                    System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
-                                    doc.LoadXml(resposta.XmlCompleto);
-                                    
-                                    // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
-                                    System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
-                                    if (protocoloList != null && protocoloList.Count > 0)
-                                    {
-                                        protocoloExtraido = protocoloList[0].InnerText.Trim();
-                                    }
-                                    else
-                                    {
-                                        // Tentar com XPath (com namespace)
-                                        System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
-                                        nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
-                                        
-                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
-                                            ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
-                                            ?? doc.SelectSingleNode("//protocolo")
-                                            ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
-                                        
-                                        if (protocoloNode != null)
-                                        {
-                                            protocoloExtraido = protocoloNode.InnerText.Trim();
-                                        }
-                                        else
-                                        {
-                                            // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
-                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
-                                            if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
-                                            {
-                                                protocoloExtraido = numeroProtocoloList[0].InnerText.Trim();
-                                            }
-                                        }
-                                    }
-                                    
-                                    if (!string.IsNullOrEmpty(protocoloExtraido))
-                                    {
-                                        AdicionarLog($"✓ Protocolo extraído do XML: {protocoloExtraido}");
-                                    }
-                                }
-                                catch (Exception exXml)
-                                {
-                                    AdicionarLog($"⚠ Erro ao extrair protocolo do XML: {exXml.Message}");
-                                    System.Diagnostics.Debug.WriteLine($"Erro ao extrair protocolo do XML: {exXml.Message}");
-                                }
+                                statusLote = "ENVIADO_SEM_PROTOCOLO";
+                                mensagemStatus = "Protocolo não retornado pelo servidor";
+                                AdicionarLog($"⚠ ATENÇÃO: Protocolo não foi retornado pelo servidor!");
+                            }
+                        }
+                        
+                        // Se encontrou protocolo, atualizar objeto resposta e adicionar à lista
+                        if (!string.IsNullOrEmpty(protocoloFinal))
+                        {
+                            resposta.Protocolo = protocoloFinal;
+                            
+                            if (!status.ProtocolosEnviados.Contains(protocoloFinal))
+                            {
+                                status.ProtocolosEnviados.Add(protocoloFinal);
                             }
                             
-                            if (!string.IsNullOrEmpty(protocoloExtraido))
-                            {
-                                AdicionarLog($"✓ Protocolo extraído: {protocoloExtraido}");
-                                
-                                // Adicionar protocolo à lista
-                                if (!status.ProtocolosEnviados.Contains(protocoloExtraido))
-                                {
-                                    status.ProtocolosEnviados.Add(protocoloExtraido);
-                                }
-                                
-                                // Atualizar protocolo no lote já registrado (sistema antigo)
+                            AdicionarLog($"✓ Protocolo obtido: {protocoloFinal}");
+                            
+                            // Atualizar protocolo no lote já registrado (sistema antigo)
                                 ProtocoloPersistenciaService.RegistrarProtocolo(
                                     TipoLote.Abertura, 
                                     arquivoCriptografado, 
-                                    protocoloExtraido,
-                                    config.Periodo,
-                                    quantidadeEventos
+                                protocoloFinal,
+                                config.Periodo,
+                                quantidadeEventos
+                            );
+                        }
+                        
+                        // Atualizar lote no banco com resposta e protocolo (se encontrado)
+                        if (idLoteBanco > 0)
+                        {
+                            try
+                            {
+                                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                string xmlResposta = resposta.XmlCompleto ?? "";
+                                persistenceService.AtualizarLote(
+                                    idLoteBanco,
+                                    statusLote,
+                                    protocoloFinal,
+                                    resposta.CodigoResposta,
+                                    resposta.Descricao,
+                                    xmlResposta,
+                                    null,
+                                    null,
+                                    null,
+                                    DateTime.Now,
+                                    null,
+                                    string.IsNullOrEmpty(protocoloFinal) ? mensagemStatus : null
                                 );
                                 
-                                // Aguardar um momento para garantir que o protocolo foi salvo
-                                System.Threading.Thread.Sleep(500);
-                                
-                                // Atualizar lista na aba Consulta
-                                if (ConsultaForm != null)
+                                if (!string.IsNullOrEmpty(protocoloFinal))
                                 {
-                                    this.Invoke((MethodInvoker)delegate
-                                    {
-                                        ConsultaForm.AtualizarListaLotes();
-                                    });
+                                    persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, 
+                                        $"Lote enviado. Protocolo: {protocoloFinal}, Código: {resposta.CodigoResposta}");
+                            }
+                            else
+                            {
+                                    persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO_AVISO", 
+                                        $"Lote enviado, mas protocolo não retornado. Código: {resposta.CodigoResposta}");
                                 }
                             }
-                            
-                            AdicionarLog($"⚠ Lote de abertura - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
-                            
-                            // Atualizar lote no banco com resposta e protocolo (se encontrado)
-                            if (idLoteBanco > 0)
+                            catch (Exception exDb)
                             {
-                                try
-                                {
-                                    var persistenceService = new EfinanceiraDatabasePersistenceService();
-                                    persistenceService.AtualizarLote(
-                                        idLoteBanco,
-                                        "ENVIADO_COM_RESPOSTA",
-                                        protocoloExtraido, // Salvar protocolo mesmo se código não for 1
-                                        resposta.CodigoResposta,
-                                        resposta.Descricao,
-                                        resposta.XmlCompleto ?? "",
-                                        null,
-                                        null,
-                                        null,
-                                        DateTime.Now,
-                                        null,
-                                        null
-                                    );
-                                    
-                                    if (!string.IsNullOrEmpty(protocoloExtraido))
-                                    {
-                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", 
-                                            $"Lote enviado. Protocolo: {protocoloExtraido}, Código: {resposta.CodigoResposta}");
-                                    }
-                                }
-                                catch (Exception exDb)
-                                {
-                                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
-                                }
+                                AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
                             }
                         }
+                        
+                        // Aguardar um momento para garantir que o protocolo foi salvo
+                        System.Threading.Thread.Sleep(500);
+                        
+                        // Atualizar lista na aba Consulta
+                        if (ConsultaForm != null)
+                        {
+                            this.Invoke((MethodInvoker)delegate
+                            {
+                                ConsultaForm.AtualizarListaLotes();
+                            });
+                        }
+                        
+                        // Exibir MessageBox com resultado
+                        if (!string.IsNullOrEmpty(protocoloFinal))
+                        {
+                            MessageBox.Show(
+                                $"Lote de abertura enviado com sucesso!\n\n" +
+                                $"PROTOCOLO: {protocoloFinal}\n\n" +
+                                $"Código de Resposta: {resposta.CodigoResposta}\n" +
+                                $"Descrição: {resposta.Descricao}\n\n" +
+                                $"Este protocolo foi salvo e pode ser consultado na aba 'Consulta'.",
+                                "Envio Concluído",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information
+                            );
+                        }
+                        else
+                        {
+                            MessageBox.Show(
+                                $"Lote enviado, mas o protocolo não foi retornado pelo servidor.\n\n" +
+                                $"Código de Resposta: {resposta.CodigoResposta}\n" +
+                                $"Descrição: {resposta.Descricao}\n\n" +
+                                $"Verifique o XML de resposta ou consulte o lote mais tarde.",
+                                "Aviso - Protocolo Não Recebido",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning
+                            );
+                        }
+                        
+                        AtualizarEstatisticas();
                     }
                     catch (Exception exEnv)
                     {
@@ -1095,6 +1121,7 @@ namespace ExemploAssinadorXML.Forms
                     btnProcessarAbertura.Enabled = true;
                     btnProcessarMovimentacao.Enabled = true;
                     btnProcessarFechamento.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
                     btnCancelar.Enabled = false;
                 });
             }
@@ -1107,6 +1134,7 @@ namespace ExemploAssinadorXML.Forms
                     btnProcessarAbertura.Enabled = true;
                     btnProcessarMovimentacao.Enabled = true;
                     btnProcessarFechamento.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
                     btnCancelar.Enabled = false;
                     MessageBox.Show($"Erro ao processar: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
@@ -1128,22 +1156,21 @@ namespace ExemploAssinadorXML.Forms
                 status.ProtocolosEnviados.Clear();
 
                 var config = ConfigForm.Config;
-                var dadosAbertura = ConfigForm.DadosAbertura;
 
                 // Validar e calcular período
                 string periodoStr = config.Periodo;
                 if (string.IsNullOrWhiteSpace(periodoStr))
                 {
-                    throw new Exception("Período não configurado. Configure o campo 'Período' na seção Configuração Geral.");
+                    throw new ArgumentException("Período não configurado. Configure o campo 'Período' na seção Configuração Geral.", nameof(config.Periodo));
                 }
 
                 // Validar formato do período
                 if (!EfinanceiraPeriodoUtil.ValidarPeriodo(periodoStr))
                 {
-                    throw new Exception($"Período inválido: {periodoStr}. Deve estar no formato YYYYMM onde MM deve ser:\n" +
+                    throw new ArgumentException($"Período inválido: {periodoStr}. Deve estar no formato YYYYMM onde MM deve ser:\n" +
                         $"  • 01 ou 06 = Primeiro semestre (Janeiro a Junho)\n" +
                         $"  • 02 ou 12 = Segundo semestre (Julho a Dezembro)\n" +
-                        $"Exemplos: 202301 (Jan-Jun/2023) ou 202302 (Jul-Dez/2023)");
+                        $"Exemplos: 202301 (Jan-Jun/2023) ou 202302 (Jul-Dez/2023)", nameof(config.Periodo));
                 }
 
                 // Calcular datas do período semestral
@@ -1152,8 +1179,8 @@ namespace ExemploAssinadorXML.Forms
                 AdicionarLog($"Período configurado: {periodoStr}");
                 AdicionarLog($"Datas calculadas pelo EfinanceiraPeriodoUtil: {dataInicio} a {dataFim}");
                 
-                DateTime dtInicio = DateTime.Parse(dataInicio);
-                DateTime dtFim = DateTime.Parse(dataFim);
+                DateTime dtInicio = DateTime.Parse(dataInicio, CULTURE_INFO_PT_BR);
+                DateTime dtFim = DateTime.Parse(dataFim, CULTURE_INFO_PT_BR);
                 
                 AdicionarLog($"Datas parseadas: dtInicio={dtInicio:yyyy-MM-dd}, dtFim={dtFim:yyyy-MM-dd}");
                 
@@ -1168,7 +1195,7 @@ namespace ExemploAssinadorXML.Forms
                 // Validação: garantir que os meses estão corretos
                 if (mesInicial < 1 || mesInicial > 12 || mesFinal < 1 || mesFinal > 12)
                 {
-                    throw new Exception($"Meses inválidos calculados: Mês Inicial={mesInicial}, Mês Final={mesFinal}. Verifique o período configurado.");
+                    throw new InvalidOperationException($"Meses inválidos calculados: Mês Inicial={mesInicial}, Mês Final={mesFinal}. Verifique o período configurado.");
                 }
 
                 // Para períodos semestrais, validar:
@@ -1176,14 +1203,14 @@ namespace ExemploAssinadorXML.Forms
                 // - Se mesInicial = 7, mesFinal deve ser 12 (Jul-Dez)
                 if ((mesInicial == 1 && mesFinal != 6) || (mesInicial == 7 && mesFinal != 12))
                 {
-                    throw new Exception($"Período semestral inválido: Mês Inicial={mesInicial}, Mês Final={mesFinal}. " +
+                    throw new InvalidOperationException($"Período semestral inválido: Mês Inicial={mesInicial}, Mês Final={mesFinal}. " +
                         $"Esperado: 1-6 (Jan-Jun) ou 7-12 (Jul-Dez). Verifique o período '{periodoStr}' configurado.");
                 }
 
                 // Garantir que mesInicial <= mesFinal (para a query SQL funcionar corretamente)
                 if (mesInicial > mesFinal)
                 {
-                    throw new Exception($"Erro: Mês Inicial ({mesInicial}) é maior que Mês Final ({mesFinal}). " +
+                    throw new InvalidOperationException($"Erro: Mês Inicial ({mesInicial}) é maior que Mês Final ({mesFinal}). " +
                         $"Isso não é válido para um período semestral. Período configurado: {periodoStr}");
                 }
 
@@ -1192,7 +1219,7 @@ namespace ExemploAssinadorXML.Forms
                 var dbService = new EfinanceiraDatabaseService();
                 if (!dbService.TestarConexao())
                 {
-                    throw new Exception("Não foi possível conectar ao banco de dados. Verifique as credenciais.");
+                    throw new InvalidOperationException("Não foi possível conectar ao banco de dados. Verifique as credenciais.");
                 }
                 AdicionarLog("Conexão com banco de dados estabelecida.");
 
@@ -1276,7 +1303,7 @@ namespace ExemploAssinadorXML.Forms
                         try
                         {
                             var persistenceService = new EfinanceiraDatabasePersistenceService();
-                            string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : "HOMOLOG";
+                            string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : AMBIENTE_HOMOLOG;
                             idLoteBanco = persistenceService.RegistrarLote(
                                 TipoLote.Movimentacao,
                                 periodoStr,
@@ -1287,7 +1314,7 @@ namespace ExemploAssinadorXML.Forms
                                 null, // Ainda não criptografado
                                 ambienteStr
                             );
-                            persistenceService.RegistrarLogLote(idLoteBanco, "GERACAO", $"XML gerado: {Path.GetFileName(arquivoXml)}");
+                            persistenceService.RegistrarLogLote(idLoteBanco, LOG_GERACAO, $"XML gerado: {Path.GetFileName(arquivoXml)}");
                             
                             // Registrar eventos do lote
                             persistenceService.RegistrarEventosDoLote(idLoteBanco, pessoasLote);
@@ -1303,7 +1330,7 @@ namespace ExemploAssinadorXML.Forms
                         var assinaturaService = new EfinanceiraAssinaturaService();
                         X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
                         var xmlAssinado = assinaturaService.AssinarEventosDoArquivo(arquivoXml, cert);
-                        string arquivoAssinado = arquivoXml.Replace(".xml", "-ASSINADO.xml");
+                        string arquivoAssinado = arquivoXml.Replace(".xml", SUFIXO_ASSINADO);
                         xmlAssinado.Save(arquivoAssinado);
                         status.LotesAssinados++;
                         AtualizarEstatisticas();
@@ -1386,7 +1413,7 @@ namespace ExemploAssinadorXML.Forms
                                             doc.LoadXml(resposta.XmlCompleto);
                                             
                                             // Primeiro tentar com GetElementsByTagName (sem namespace, como no Java)
-                                            System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName("protocoloEnvio");
+                                            System.Xml.XmlNodeList protocoloList = doc.GetElementsByTagName(PROTOCOLO_ENVIO);
                                             if (protocoloList != null && protocoloList.Count > 0)
                                             {
                                                 protocoloFinal = protocoloList[0].InnerText.Trim();
@@ -1395,12 +1422,12 @@ namespace ExemploAssinadorXML.Forms
                                             {
                                                 // Tentar com XPath (com namespace)
                                                 System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
-                                                nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                                nsmgr.AddNamespace("ns", NAMESPACE_ENVIO_LOTE);
                                                 
-                                                System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
-                                                    ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
-                                                    ?? doc.SelectSingleNode("//protocolo")
-                                                    ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                                System.Xml.XmlNode protocoloNode = doc.SelectSingleNode(PROTOCOLO_XPATH)
+                                                    ?? doc.SelectSingleNode(PROTOCOLO_NS_XPATH, nsmgr)
+                                                    ?? doc.SelectSingleNode(PROTOCOLO_SIMPLE_XPATH)
+                                                    ?? doc.SelectSingleNode(PROTOCOLO_NS_SIMPLE_XPATH, nsmgr);
                                                 
                                                 if (protocoloNode != null)
                                                 {
@@ -1409,7 +1436,7 @@ namespace ExemploAssinadorXML.Forms
                                                 else
                                                 {
                                                     // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
-                                                    System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                                                    System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName(NUMERO_PROTOCOLO);
                                                     if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
                                                     {
                                                         protocoloFinal = numeroProtocoloList[0].InnerText.Trim();
@@ -1453,7 +1480,7 @@ namespace ExemploAssinadorXML.Forms
                                                 string xmlResposta = resposta.XmlCompleto ?? "";
                                                 persistenceService.AtualizarLote(
                                                     idLoteBanco,
-                                                    "ENVIADO",
+                                                    STATUS_ENVIADO,
                                                     protocoloFinal,
                                                     resposta.CodigoResposta,
                                                     resposta.Descricao,
@@ -1465,7 +1492,7 @@ namespace ExemploAssinadorXML.Forms
                                                     null,
                                                     null
                                                 );
-                                                persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
+                                                persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
                                             }
                                             catch (Exception exDb)
                                             {
@@ -1567,7 +1594,7 @@ namespace ExemploAssinadorXML.Forms
                                             string erroMsg = $"REJEITADO - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}";
                                             persistenceService.AtualizarLote(
                                                 idLoteBanco,
-                                                "REJEITADO",
+                                                STATUS_REJEITADO,
                                                 null,
                                                 resposta.CodigoResposta,
                                                 resposta.Descricao,
@@ -1609,12 +1636,12 @@ namespace ExemploAssinadorXML.Forms
                                             doc.LoadXml(resposta.XmlCompleto);
                                             
                                             System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
-                                            nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                            nsmgr.AddNamespace("ns", NAMESPACE_ENVIO_LOTE);
                                             
-                                            System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
-                                                ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
-                                                ?? doc.SelectSingleNode("//protocolo")
-                                                ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                            System.Xml.XmlNode protocoloNode = doc.SelectSingleNode(PROTOCOLO_XPATH)
+                                                ?? doc.SelectSingleNode(PROTOCOLO_NS_XPATH, nsmgr)
+                                                ?? doc.SelectSingleNode(PROTOCOLO_SIMPLE_XPATH)
+                                                ?? doc.SelectSingleNode(PROTOCOLO_NS_SIMPLE_XPATH, nsmgr);
                                             
                                             if (protocoloNode != null)
                                             {
@@ -1684,7 +1711,7 @@ namespace ExemploAssinadorXML.Forms
                                             
                                             if (!string.IsNullOrEmpty(protocoloExtraido))
                                             {
-                                                persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", 
+                                                persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, 
                                                     $"Lote enviado. Protocolo: {protocoloExtraido}, Código: {resposta.CodigoResposta}");
                                             }
                                         }
@@ -1745,6 +1772,7 @@ namespace ExemploAssinadorXML.Forms
                     btnProcessarAbertura.Enabled = true;
                     btnProcessarMovimentacao.Enabled = true;
                     btnProcessarFechamento.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
                     btnCancelar.Enabled = false;
                 });
             }
@@ -1761,6 +1789,7 @@ namespace ExemploAssinadorXML.Forms
                     btnProcessarAbertura.Enabled = true;
                     btnProcessarMovimentacao.Enabled = true;
                     btnProcessarFechamento.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
                     btnCancelar.Enabled = false;
                     MessageBox.Show($"Erro ao processar movimentação: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
@@ -1793,7 +1822,7 @@ namespace ExemploAssinadorXML.Forms
                 try
                 {
                     var persistenceService = new EfinanceiraDatabasePersistenceService();
-                    string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : "HOMOLOG";
+                    string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : AMBIENTE_HOMOLOG;
                     idLoteBanco = persistenceService.RegistrarLote(
                         TipoLote.Fechamento,
                         config.Periodo,
@@ -1804,7 +1833,7 @@ namespace ExemploAssinadorXML.Forms
                         null, // Ainda não criptografado
                         ambienteStr
                     );
-                    persistenceService.RegistrarLogLote(idLoteBanco, "GERACAO", $"XML gerado: {Path.GetFileName(arquivoXml)}");
+                    persistenceService.RegistrarLogLote(idLoteBanco, LOG_GERACAO, $"XML gerado: {Path.GetFileName(arquivoXml)}");
                     AdicionarLog($"Lote registrado no banco (ID: {idLoteBanco}).");
                 }
                 catch (Exception exDb)
@@ -1824,7 +1853,7 @@ namespace ExemploAssinadorXML.Forms
                 var assinaturaService = new EfinanceiraAssinaturaService();
                 X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
                 var xmlAssinado = assinaturaService.AssinarEventosDoArquivo(arquivoXml, cert);
-                string arquivoAssinado = arquivoXml.Replace(".xml", "-ASSINADO.xml");
+                string arquivoAssinado = arquivoXml.Replace(".xml", SUFIXO_ASSINADO);
                 xmlAssinado.Save(arquivoAssinado);
                 status.LotesAssinados = 1;
                 AtualizarEstatisticas();
@@ -1836,8 +1865,8 @@ namespace ExemploAssinadorXML.Forms
                     try
                     {
                         var persistenceService = new EfinanceiraDatabasePersistenceService();
-                        persistenceService.AtualizarLote(idLoteBanco, "ASSINADO");
-                        persistenceService.RegistrarLogLote(idLoteBanco, "ASSINATURA", $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                        persistenceService.AtualizarLote(idLoteBanco, STATUS_ASSINADO);
+                        persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ASSINATURA, $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
                     }
                     catch (Exception exDb)
                     {
@@ -1861,8 +1890,8 @@ namespace ExemploAssinadorXML.Forms
                     try
                     {
                         var persistenceService = new EfinanceiraDatabasePersistenceService();
-                        persistenceService.AtualizarLote(idLoteBanco, "CRIPTOGRAFADO");
-                        persistenceService.RegistrarLogLote(idLoteBanco, "CRIPTOGRAFIA", $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
+                        persistenceService.AtualizarLote(idLoteBanco, STATUS_CRIPTOGRAFADO);
+                        persistenceService.RegistrarLogLote(idLoteBanco, STATUS_CRIPTOGRAFIA, $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
                     }
                     catch (Exception exDb)
                     {
@@ -1916,12 +1945,12 @@ namespace ExemploAssinadorXML.Forms
                                     {
                                         // Tentar com XPath (com namespace)
                                         System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
-                                        nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                        nsmgr.AddNamespace("ns", NAMESPACE_ENVIO_LOTE);
                                         
-                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
-                                            ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
-                                            ?? doc.SelectSingleNode("//protocolo")
-                                            ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode(PROTOCOLO_XPATH)
+                                            ?? doc.SelectSingleNode(PROTOCOLO_NS_XPATH, nsmgr)
+                                            ?? doc.SelectSingleNode(PROTOCOLO_SIMPLE_XPATH)
+                                            ?? doc.SelectSingleNode(PROTOCOLO_NS_SIMPLE_XPATH, nsmgr);
                                         
                                         if (protocoloNode != null)
                                         {
@@ -1930,7 +1959,7 @@ namespace ExemploAssinadorXML.Forms
                                         else
                                         {
                                             // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
-                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName(NUMERO_PROTOCOLO);
                                             if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
                                             {
                                                 protocoloFinal = numeroProtocoloList[0].InnerText.Trim();
@@ -1974,7 +2003,7 @@ namespace ExemploAssinadorXML.Forms
                                         string xmlResposta = resposta.XmlCompleto ?? "";
                                         persistenceService.AtualizarLote(
                                             idLoteBanco,
-                                            "ENVIADO",
+                                            STATUS_ENVIADO,
                                             protocoloFinal,
                                             resposta.CodigoResposta,
                                             resposta.Descricao,
@@ -1986,7 +2015,7 @@ namespace ExemploAssinadorXML.Forms
                                             null,
                                             null
                                         );
-                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
+                                        persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
                                     }
                                     catch (Exception exDb)
                                     {
@@ -2088,7 +2117,7 @@ namespace ExemploAssinadorXML.Forms
                                     string erroMsg = $"REJEITADO - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}";
                                     persistenceService.AtualizarLote(
                                         idLoteBanco,
-                                        "REJEITADO",
+                                        STATUS_REJEITADO,
                                         null,
                                         resposta.CodigoResposta,
                                         resposta.Descricao,
@@ -2139,12 +2168,12 @@ namespace ExemploAssinadorXML.Forms
                                     {
                                         // Tentar com XPath (com namespace)
                                         System.Xml.XmlNamespaceManager nsmgr = new System.Xml.XmlNamespaceManager(doc.NameTable);
-                                        nsmgr.AddNamespace("ns", "http://www.eFinanceira.gov.br/schemas/envioLoteCriptografado/v1_2_0");
+                                        nsmgr.AddNamespace("ns", NAMESPACE_ENVIO_LOTE);
                                         
-                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode("//protocoloEnvio")
-                                            ?? doc.SelectSingleNode("//ns:protocoloEnvio", nsmgr)
-                                            ?? doc.SelectSingleNode("//protocolo")
-                                            ?? doc.SelectSingleNode("//ns:protocolo", nsmgr);
+                                        System.Xml.XmlNode protocoloNode = doc.SelectSingleNode(PROTOCOLO_XPATH)
+                                            ?? doc.SelectSingleNode(PROTOCOLO_NS_XPATH, nsmgr)
+                                            ?? doc.SelectSingleNode(PROTOCOLO_SIMPLE_XPATH)
+                                            ?? doc.SelectSingleNode(PROTOCOLO_NS_SIMPLE_XPATH, nsmgr);
                                         
                                         if (protocoloNode != null)
                                         {
@@ -2153,7 +2182,7 @@ namespace ExemploAssinadorXML.Forms
                                         else
                                         {
                                             // Tentar buscar por numeroProtocolo (como no método extrairProtocolo do Java)
-                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName("numeroProtocolo");
+                                            System.Xml.XmlNodeList numeroProtocoloList = doc.GetElementsByTagName(NUMERO_PROTOCOLO);
                                             if (numeroProtocoloList != null && numeroProtocoloList.Count > 0)
                                             {
                                                 protocoloExtraido = numeroProtocoloList[0].InnerText.Trim();
@@ -2230,7 +2259,7 @@ namespace ExemploAssinadorXML.Forms
                                     
                                     if (!string.IsNullOrEmpty(protocoloExtraido))
                                     {
-                                        persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO", 
+                                        persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, 
                                             $"Lote enviado. Protocolo: {protocoloExtraido}, Código: {resposta.CodigoResposta}");
                                     }
                                 }
@@ -2270,6 +2299,7 @@ namespace ExemploAssinadorXML.Forms
                     btnProcessarAbertura.Enabled = true;
                     btnProcessarMovimentacao.Enabled = true;
                     btnProcessarFechamento.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
                     btnCancelar.Enabled = false;
                 });
             }
@@ -2282,17 +2312,318 @@ namespace ExemploAssinadorXML.Forms
                     btnProcessarAbertura.Enabled = true;
                     btnProcessarMovimentacao.Enabled = true;
                     btnProcessarFechamento.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
                     btnCancelar.Enabled = false;
                     MessageBox.Show($"Erro ao processar: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
             }
         }
 
-        private X509Certificate2 BuscarCertificado(string thumbprint)
+        private async Task ProcessarCadastroDeclarante()
+        {
+            try
+            {
+                AtualizarEtapa("Iniciando processamento de cadastro de declarante...");
+                status.InicioProcessamento = DateTime.Now;
+                status.TotalLotes = 1;
+                status.ProtocolosEnviados.Clear();
+
+                var config = ConfigForm.Config;
+                var dadosCadastro = ConfigForm.DadosCadastroDeclarante;
+
+                // 1. Gerar XML
+                AtualizarEtapa("Gerando XML de cadastro de declarante...");
+                var geradorService = new EfinanceiraGeradorXmlService();
+                string arquivoXml = geradorService.GerarXmlCadastroDeclarante(dadosCadastro, config.DiretorioLotes);
+                AdicionarLog($"XML gerado: {arquivoXml}");
+
+                if (cancelarProcessamento) return;
+
+                // Registrar lote no banco após gerar XML
+                int quantidadeEventos = 1; // Cadastro de declarante sempre tem 1 evento
+                long idLoteBanco = 0;
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : AMBIENTE_HOMOLOG;
+                    idLoteBanco = persistenceService.RegistrarLote(
+                        TipoLote.CadastroDeclarante,
+                        null, // Cadastro não tem período
+                        quantidadeEventos,
+                        config.CnpjDeclarante,
+                        arquivoXml,
+                        null, // Ainda não assinado
+                        null, // Ainda não criptografado
+                        ambienteStr
+                    );
+                    persistenceService.RegistrarLogLote(idLoteBanco, LOG_GERACAO, $"XML gerado: {Path.GetFileName(arquivoXml)}");
+                    AdicionarLog($"Lote registrado no banco (ID: {idLoteBanco}).");
+                }
+                catch (Exception exDb)
+                {
+                    string erroCompleto = $"⚠ ERRO ao registrar lote no banco: {exDb.Message}";
+                    AdicionarLog(erroCompleto);
+                    System.Diagnostics.Debug.WriteLine(erroCompleto);
+                    System.Diagnostics.Debug.WriteLine($"Stack Trace: {exDb.StackTrace}");
+                }
+
+                if (cancelarProcessamento) return;
+
+                // 2. Assinar XML
+                AtualizarEtapa("Assinando XML...");
+                var assinaturaService = new EfinanceiraAssinaturaService();
+                X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
+                var xmlAssinado = assinaturaService.AssinarEventosDoArquivo(arquivoXml, cert);
+                string arquivoAssinado = arquivoXml.Replace(".xml", SUFIXO_ASSINADO);
+                xmlAssinado.Save(arquivoAssinado);
+                AdicionarLog($"XML assinado: {arquivoAssinado}");
+
+                if (idLoteBanco > 0)
+                {
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        persistenceService.AtualizarLote(idLoteBanco, STATUS_ASSINADO);
+                        persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ASSINATURA, $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                    }
+                    catch (Exception exDb)
+                    {
+                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após assinatura: {exDb.Message}");
+                    }
+                }
+
+                if (cancelarProcessamento) return;
+
+                // 3. Criptografar XML
+                AtualizarEtapa("Criptografando XML...");
+                var criptografiaService = new EfinanceiraCriptografiaService();
+                string arquivoCriptografado = criptografiaService.CriptografarLote(arquivoAssinado, config.CertServidorThumbprint);
+                AdicionarLog($"XML criptografado: {arquivoCriptografado}");
+
+                if (idLoteBanco > 0)
+                {
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        persistenceService.AtualizarLote(idLoteBanco, STATUS_CRIPTOGRAFADO);
+                        persistenceService.RegistrarLogLote(idLoteBanco, STATUS_CRIPTOGRAFIA, $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
+                    }
+                    catch (Exception exDb)
+                    {
+                        AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após criptografia: {exDb.Message}");
+                    }
+                }
+
+                if (cancelarProcessamento) return;
+
+                // 4. Enviar (se habilitado)
+                if (!chkApenasProcessar.Checked && config.TestEnvioHabilitado)
+                {
+                    AtualizarEtapa("Enviando lote para e-Financeira...");
+                    X509Certificate2 certificado = BuscarCertificado(config.CertThumbprint);
+                    var envioService = new EfinanceiraEnvioService();
+                    var resposta = envioService.EnviarLote(arquivoCriptografado, config, certificado);
+
+                    AdicionarLog($"Código de Resposta: {resposta.CodigoResposta}");
+                    AdicionarLog($"Descrição: {resposta.Descricao}");
+
+                    // Extrair protocolo
+                    string protocoloFinal = ExtrairProtocolo(resposta);
+
+                    if (resposta.CodigoResposta == 1)
+                    {
+                        if (!string.IsNullOrEmpty(protocoloFinal))
+                        {
+                            if (!status.ProtocolosEnviados.Contains(protocoloFinal))
+                            {
+                                status.ProtocolosEnviados.Add(protocoloFinal);
+                            }
+                            
+                            AdicionarLog($"✓ Lote de cadastro enviado com sucesso! Protocolo: {protocoloFinal}");
+                            AdicionarLog($"════════════════════════════════════════");
+                            AdicionarLog($"PROTOCOLO DO LOTE DE CADASTRO:");
+                            AdicionarLog($"{protocoloFinal}");
+                            AdicionarLog($"════════════════════════════════════════");
+                            
+                            // Atualizar lote no banco após envio
+                            if (idLoteBanco > 0)
+                            {
+                                try
+                                {
+                                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                    string xmlResposta = resposta.XmlCompleto ?? "";
+                                    persistenceService.AtualizarLote(
+                                        idLoteBanco,
+                                        "ENVIADO",
+                                        protocoloFinal,
+                                        resposta.CodigoResposta,
+                                        resposta.Descricao,
+                                        xmlResposta,
+                                        null,
+                                        null,
+                                        null,
+                                        DateTime.Now,
+                                        null,
+                                        null
+                                    );
+                                    persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, $"Lote enviado com sucesso. Protocolo: {protocoloFinal}");
+                                }
+                                catch (Exception exDb)
+                                {
+                                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após envio: {exDb.Message}");
+                                }
+                            }
+                            
+                            // Atualizar protocolo no lote já registrado (sistema antigo)
+                            ProtocoloPersistenciaService.RegistrarProtocolo(
+                                TipoLote.CadastroDeclarante, 
+                                arquivoCriptografado, 
+                                protocoloFinal,
+                                null,
+                                quantidadeEventos
+                            );
+                        }
+                        else
+                        {
+                            AdicionarLog($"⚠ Lote enviado, mas protocolo não foi extraído da resposta.");
+                        }
+                    }
+                    else if (resposta.CodigoResposta == 7)
+                    {
+                        AdicionarLog($"✗ Lote de cadastro REJEITADO - Código: {resposta.CodigoResposta}");
+                        AdicionarLog($"  Descrição: {resposta.Descricao}");
+                        
+                        // Atualizar lote no banco com erro
+                        if (idLoteBanco > 0)
+                        {
+                            try
+                            {
+                                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                string erroMsg = $"REJEITADO - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}";
+                                persistenceService.AtualizarLote(
+                                    idLoteBanco,
+                                    STATUS_REJEITADO,
+                                    null,
+                                    resposta.CodigoResposta,
+                                    resposta.Descricao,
+                                    resposta.XmlCompleto ?? "",
+                                    null,
+                                    null,
+                                    null,
+                                    DateTime.Now,
+                                    null,
+                                    erroMsg
+                                );
+                                persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO_ERRO", erroMsg);
+                            }
+                            catch (Exception exDb)
+                            {
+                                AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco após rejeição: {exDb.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        AdicionarLog($"⚠ Lote enviado, mas código de resposta não é 1 (sucesso) nem 7 (rejeição). Código: {resposta.CodigoResposta}");
+                        
+                        // Tentar extrair protocolo mesmo assim
+                        if (!string.IsNullOrEmpty(protocoloFinal))
+                        {
+                            if (!status.ProtocolosEnviados.Contains(protocoloFinal))
+                            {
+                                status.ProtocolosEnviados.Add(protocoloFinal);
+                            }
+                            
+                            AdicionarLog($"✓ Protocolo extraído: {protocoloFinal}");
+                            
+                            // Atualizar lote no banco
+                            if (idLoteBanco > 0)
+                            {
+                                try
+                                {
+                                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                    string xmlResposta = resposta.XmlCompleto ?? "";
+                                    persistenceService.AtualizarLote(
+                                        idLoteBanco,
+                                        "ENVIADO",
+                                        protocoloFinal,
+                                        resposta.CodigoResposta,
+                                        resposta.Descricao,
+                                        xmlResposta,
+                                        null,
+                                        null,
+                                        null,
+                                        DateTime.Now,
+                                        null,
+                                        null
+                                    );
+                                    persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, $"Lote enviado. Protocolo: {protocoloFinal}");
+                                }
+                                catch (Exception exDb)
+                                {
+                                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                                }
+                            }
+                            
+                            // Atualizar protocolo no lote já registrado (sistema antigo)
+                            ProtocoloPersistenciaService.RegistrarProtocolo(
+                                TipoLote.CadastroDeclarante, 
+                                arquivoCriptografado, 
+                                protocoloFinal,
+                                null,
+                                quantidadeEventos
+                            );
+                        }
+                    }
+                }
+                else
+                {
+                    AdicionarLog("ℹ Envio desabilitado ou modo 'Apenas Processar' ativado. XML gerado, assinado e criptografado, mas não enviado.");
+                }
+
+                status.LotesProcessados = 1;
+                status.LotesAssinados = 1;
+                status.LotesCriptografados = 1;
+                if (!chkApenasProcessar.Checked && config.TestEnvioHabilitado)
+                {
+                    status.LotesEnviados = 1;
+                }
+
+                AtualizarEtapa("Processamento concluído!");
+                AdicionarLog("✓ Processamento de cadastro de declarante concluído com sucesso!");
+
+                this.Invoke((MethodInvoker)delegate
+                {
+                    btnProcessarAbertura.Enabled = true;
+                    btnProcessarMovimentacao.Enabled = true;
+                    btnProcessarFechamento.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
+                    btnCancelar.Enabled = false;
+                });
+            }
+            catch (Exception ex)
+            {
+                AdicionarLog($"ERRO: {ex.Message}");
+                status.LotesComErro = 1;
+                this.Invoke((MethodInvoker)delegate
+                {
+                    btnProcessarAbertura.Enabled = true;
+                    btnProcessarMovimentacao.Enabled = true;
+                    btnProcessarFechamento.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
+                    btnProcessarCadastroDeclarante.Enabled = true;
+                    btnCancelar.Enabled = false;
+                    MessageBox.Show($"Erro ao processar: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                });
+            }
+        }
+
+        private static X509Certificate2 BuscarCertificado(string thumbprint)
         {
             if (string.IsNullOrEmpty(thumbprint))
             {
-                throw new Exception("Thumbprint do certificado não configurado.");
+                throw new ArgumentException("Thumbprint do certificado não configurado.", nameof(thumbprint));
             }
 
             string thumbprintNormalizado = thumbprint.Replace(" ", "").Replace("-", "").ToUpper();
@@ -2314,7 +2645,7 @@ namespace ExemploAssinadorXML.Forms
                 store.Close();
             }
 
-            throw new Exception($"Certificado com thumbprint '{thumbprint}' não encontrado.");
+            throw new InvalidOperationException($"Certificado com thumbprint '{thumbprint}' não encontrado.");
         }
 
         private void AtualizarEtapa(string etapa)
@@ -2323,7 +2654,7 @@ namespace ExemploAssinadorXML.Forms
             {
                 status.EtapaAtual = etapa;
                 lblEtapaAtual.Text = $"Etapa: {etapa}";
-                status.TempoDecorrido = DateTime.Now - status.InicioProcessamento;
+                status.TempoDecorrido = DateTime.UtcNow - status.InicioProcessamento;
                 lblTempoDecorrido.Text = $"Tempo Decorrido: {status.TempoDecorrido:hh\\:mm\\:ss}";
             });
         }

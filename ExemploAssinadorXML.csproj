@@ -117,6 +117,7 @@
     <Compile Include="Models\EfinanceiraConfig.cs" />
     <Compile Include="Models\DadosAbertura.cs" />
     <Compile Include="Models\DadosFechamento.cs" />
+    <Compile Include="Models\DadosCadastroDeclarante.cs" />
     <Compile Include="Models\DadosPessoaConta.cs" />
     <Compile Include="Models\StatusProcessamento.cs" />
     <Compile Include="Services\EfinanceiraAssinaturaService.cs" />
@@ -130,6 +131,7 @@
     <Compile Include="Services\RSAPKCS1SHA256SignatureDescription.cs" />
     <Compile Include="Services\ConfiguracaoPersistenciaService.cs" />
     <Compile Include="Services\ProtocoloPersistenciaService.cs" />
+    <Compile Include="Services\EfinanceiraLimpezaService.cs" />
     <Compile Include="Forms\TutorialForm.cs">
       <SubType>Form</SubType>
     </Compile>

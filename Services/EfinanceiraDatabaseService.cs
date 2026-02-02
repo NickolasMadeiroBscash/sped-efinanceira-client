@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using Npgsql;
+using NpgsqlTypes;
 using ExemploAssinadorXML.Models;
 
 namespace ExemploAssinadorXML.Services
@@ -99,7 +100,7 @@ namespace ExemploAssinadorXML.Services
                     COALESCE(p.telefone, '') as Telefone,
                     COALESCE(p.email, '') as Email,
                     c.idconta as IdConta,
-                    CAST(c.numeroconta AS TEXT) as NumeroConta,
+                    COALESCE(CAST(c.numeroconta AS TEXT), '') as NumeroConta,
                     COALESCE(c.digitoconta, '') as DigitoConta,
                     COALESCE(c.saldoatual, 0) as SaldoAtual,
                     COALESCE(e.logradouro, '') as Logradouro,
@@ -142,58 +143,79 @@ namespace ExemploAssinadorXML.Services
 
                     using (var command = new NpgsqlCommand(sql, connection))
                     {
-                        command.Parameters.AddWithValue("@ano", ano);
-                        command.Parameters.AddWithValue("@mesInicial", mesInicial);
-                        command.Parameters.AddWithValue("@mesFinal", mesFinal);
-                        command.Parameters.AddWithValue("@limit", limit);
-                        command.Parameters.AddWithValue("@offset", offset);
+                        // Configurar timeout maior para consultas complexas
+                        command.CommandTimeout = 300; // 5 minutos
+                        
+                        // Especificar tipos explicitamente para evitar problemas de inferência
+                        command.Parameters.Add(new NpgsqlParameter("@ano", NpgsqlDbType.Integer) { Value = ano });
+                        command.Parameters.Add(new NpgsqlParameter("@mesInicial", NpgsqlDbType.Integer) { Value = mesInicial });
+                        command.Parameters.Add(new NpgsqlParameter("@mesFinal", NpgsqlDbType.Integer) { Value = mesFinal });
+                        command.Parameters.Add(new NpgsqlParameter("@limit", NpgsqlDbType.Integer) { Value = limit });
+                        command.Parameters.Add(new NpgsqlParameter("@offset", NpgsqlDbType.Integer) { Value = offset });
 
                         System.Diagnostics.Debug.WriteLine("Executando query SQL...");
                         using (var reader = command.ExecuteReader())
                         {
                             int contador = 0;
-                            while (reader.Read())
+                            try
                             {
-                                try
+                                while (reader.Read())
                                 {
-                                    var pessoa = new DadosPessoaConta
+                                    try
                                     {
-                                        IdPessoa = GetSafeLong(reader, "IdPessoa"),
-                                        Documento = GetSafeString(reader, "Documento"),
-                                        Nome = GetSafeString(reader, "Nome"),
-                                        Cpf = GetSafeString(reader, "Cpf"),
-                                        Nacionalidade = GetSafeString(reader, "Nacionalidade", "BR"),
-                                        Telefone = GetSafeString(reader, "Telefone"),
-                                        Email = GetSafeString(reader, "Email"),
-                                        IdConta = GetSafeLong(reader, "IdConta"),
-                                        NumeroConta = GetSafeNumeroConta(reader, "NumeroConta"),
-                                        DigitoConta = GetSafeString(reader, "DigitoConta"),
-                                        SaldoAtual = GetSafeDecimal(reader, "SaldoAtual"),
-                                        Logradouro = GetSafeString(reader, "Logradouro"),
-                                        Numero = GetSafeString(reader, "Numero"),
-                                        Complemento = GetSafeString(reader, "Complemento"),
-                                        Bairro = GetSafeString(reader, "Bairro"),
-                                        Cep = GetSafeString(reader, "Cep"),
-                                        TipoLogradouro = GetSafeString(reader, "TipoLogradouro"),
-                                        EnderecoLivre = GetSafeString(reader, "EnderecoLivre"),
-                                        TotCreditos = GetSafeDecimal(reader, "TotCreditos"),
-                                        TotDebitos = GetSafeDecimal(reader, "TotDebitos")
-                                    };
+                                        var pessoa = new DadosPessoaConta
+                                        {
+                                            IdPessoa = GetSafeLong(reader, "IdPessoa"),
+                                            Documento = GetSafeString(reader, "Documento"),
+                                            Nome = GetSafeString(reader, "Nome"),
+                                            Cpf = GetSafeString(reader, "Cpf"),
+                                            Nacionalidade = GetSafeString(reader, "Nacionalidade", "BR"),
+                                            Telefone = GetSafeString(reader, "Telefone"),
+                                            Email = GetSafeString(reader, "Email"),
+                                            IdConta = GetSafeLong(reader, "IdConta"),
+                                            NumeroConta = GetSafeNumeroConta(reader, "NumeroConta"),
+                                            DigitoConta = GetSafeString(reader, "DigitoConta"),
+                                            SaldoAtual = GetSafeDecimal(reader, "SaldoAtual"),
+                                            Logradouro = GetSafeString(reader, "Logradouro"),
+                                            Numero = GetSafeString(reader, "Numero"),
+                                            Complemento = GetSafeString(reader, "Complemento"),
+                                            Bairro = GetSafeString(reader, "Bairro"),
+                                            Cep = GetSafeString(reader, "Cep"),
+                                            TipoLogradouro = GetSafeString(reader, "TipoLogradouro"),
+                                            EnderecoLivre = GetSafeString(reader, "EnderecoLivre"),
+                                            TotCreditos = GetSafeDecimal(reader, "TotCreditos"),
+                                            TotDebitos = GetSafeDecimal(reader, "TotDebitos")
+                                        };
 
-                                    pessoas.Add(pessoa);
-                                    contador++;
+                                        pessoas.Add(pessoa);
+                                        contador++;
+                                    }
+                                    catch (Exception exLinha)
+                                    {
+                                        // Log do erro mas continua processando outras linhas
+                                        System.Diagnostics.Debug.WriteLine($"✗ Erro ao processar linha {contador + 1}: {exLinha.Message}");
+                                        System.Diagnostics.Debug.WriteLine($"   Stack Trace: {exLinha.StackTrace}");
+                                        if (exLinha.InnerException != null)
+                                        {
+                                            System.Diagnostics.Debug.WriteLine($"   Inner Exception: {exLinha.InnerException.Message}");
+                                        }
+                                    }
                                 }
-                                catch (Exception exLinha)
-                                {
-                                    // Log do erro mas continua processando outras linhas
-                                    System.Diagnostics.Debug.WriteLine($"✗ Erro ao processar linha {contador + 1}: {exLinha.Message}");
-                                    continue;
-                                }
+                                
+                                System.Diagnostics.Debug.WriteLine($"✓ Consulta concluída: {contador} registro(s) encontrado(s) e processado(s) com sucesso");
+                                System.Diagnostics.Debug.WriteLine($"✓ Total retornado: {pessoas.Count} pessoa(s)");
+                                System.Diagnostics.Debug.WriteLine("");
                             }
-                            
-                            System.Diagnostics.Debug.WriteLine($"✓ Consulta concluída: {contador} registro(s) encontrado(s) e processado(s) com sucesso");
-                            System.Diagnostics.Debug.WriteLine($"✓ Total retornado: {pessoas.Count} pessoa(s)");
-                            System.Diagnostics.Debug.WriteLine("");
+                            catch (Exception exRead)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"✗ ERRO ao ler dados do DataReader: {exRead.Message}");
+                                System.Diagnostics.Debug.WriteLine($"   Stack Trace: {exRead.StackTrace}");
+                                if (exRead.InnerException != null)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"   Inner Exception: {exRead.InnerException.Message}");
+                                }
+                                throw;
+                            }
                         }
                     }
                 }
@@ -309,7 +331,7 @@ namespace ExemploAssinadorXML.Services
         }
 
         // Métodos auxiliares para leitura segura dos dados
-        private string GetSafeString(NpgsqlDataReader reader, string columnName, string defaultValue = "")
+        private static string GetSafeString(NpgsqlDataReader reader, string columnName, string defaultValue = "")
         {
             try
             {
@@ -322,7 +344,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private long GetSafeLong(NpgsqlDataReader reader, string columnName, long defaultValue = 0)
+        private static long GetSafeLong(NpgsqlDataReader reader, string columnName, long defaultValue = 0)
         {
             try
             {
@@ -335,7 +357,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private decimal GetSafeDecimal(NpgsqlDataReader reader, string columnName, decimal defaultValue = 0)
+        private static decimal GetSafeDecimal(NpgsqlDataReader reader, string columnName, decimal defaultValue = 0)
         {
             try
             {
@@ -365,7 +387,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private string GetSafeNumeroConta(NpgsqlDataReader reader, string columnName, string defaultValue = "")
+        private static string GetSafeNumeroConta(NpgsqlDataReader reader, string columnName, string defaultValue = "")
         {
             try
             {
@@ -409,7 +431,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private string GetNomeMes(int mes)
+        private static string GetNomeMes(int mes)
         {
             string[] meses = { "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
                 "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro" };

@@ -50,7 +50,7 @@ namespace ExemploAssinadorXML.Services
             }
             catch (Exception ex)
             {
-                throw new Exception($"Não foi possível carregar XML indicado: {ex.Message}", ex);
+                throw new InvalidOperationException($"Não foi possível carregar XML indicado: {ex.Message}", ex);
             }
 
             // Verifica se XML possui eventos
@@ -78,7 +78,7 @@ namespace ExemploAssinadorXML.Services
 
             if (eventos.Count <= 0)
             {
-                throw new Exception("Não encontrou eventos no arquivo selecionado.");
+                throw new InvalidOperationException("Não encontrou eventos no arquivo selecionado.");
             }
 
             // Assina cada evento do arquivo            
@@ -120,14 +120,14 @@ namespace ExemploAssinadorXML.Services
 
                 if (string.IsNullOrWhiteSpace(tagEventoParaAssinar))
                 {
-                    throw new Exception($"Tipo Evento inválido para a e-Financeira: '{tagEventoParaAssinar}'");
+                    throw new ArgumentException($"Tipo Evento inválido para a e-Financeira: '{tagEventoParaAssinar}'");
                 }
 
                 XmlDocument xmlDocEventoAssinado = AssinarXmlEvento(xmlDocEvento, certificadoAssinatura, tagEventoParaAssinar);
                     
                 if (xmlDocEventoAssinado == null)
                 {
-                    throw new Exception("Erro ao assinar evento.");
+                    throw new InvalidOperationException("Erro ao assinar evento.");
                 }
 
                 if (estruturaLote)
@@ -165,7 +165,7 @@ namespace ExemploAssinadorXML.Services
             return arquivoXml;
         }
 
-        private string ObtemTagEventoAssinar(XmlDocument arquivo)
+        private static string ObtemTagEventoAssinar(XmlDocument arquivo)
         {
             string tipoEvento = null;
             if (arquivo.OuterXml.Contains("evtCadDeclarante")) tipoEvento = "evtCadDeclarante";
@@ -233,7 +233,7 @@ namespace ExemploAssinadorXML.Services
             }
             catch (Exception ex)
             {                
-                throw new Exception($"Falha ao assinar xml evento: {ex.Message}", ex);
+                throw new InvalidOperationException($"Falha ao assinar xml evento: {ex.Message}", ex);
             }
         }
 

@@ -13,7 +13,26 @@ namespace ExemploAssinadorXML.Services
         private const string NAMESPACE_LOTE = "http://www.eFinanceira.gov.br/schemas/envioLoteEventosAssincrono/v1_0_0";
         private const string NAMESPACE_EVENTO_ABERTURA = "http://www.eFinanceira.gov.br/schemas/evtAberturaeFinanceira/v1_2_1";
         private const string NAMESPACE_EVENTO_FECHAMENTO = "http://www.eFinanceira.gov.br/schemas/evtFechamentoeFinanceira/v1_3_0";
+        private const string NAMESPACE_EVENTO_CADASTRO = "http://www.eFinanceira.gov.br/schemas/evtCadDeclarante/v1_2_0";
         private const string VERSAO_APLICATIVO = "00000000000000000001";
+        
+        // Constantes para literais XML
+        private const string ENCODING_UTF8 = "utf-8";
+        private const string ELEMENTO_EFINANCEIRA = "eFinanceira";
+        private const string ATTR_XMLNS_XSI = "xmlns:xsi";
+        private const string XMLNS_XSI_VALUE = "http://www.w3.org/2001/XMLSchema-instance";
+        private const string ATTR_XMLNS_XSD = "xmlns:xsd";
+        private const string XMLNS_XSD_VALUE = "http://www.w3.org/2001/XMLSchema";
+        private const string ELEMENTO_LOTE_EVENTOS_ASSINCRONO = "loteEventosAssincrono";
+        private const string ELEMENTO_CNPJ_DECLARANTE = "cnpjDeclarante";
+        private const string ELEMENTO_EVENTOS = "eventos";
+        private const string ELEMENTO_EVENTO = "evento";
+        private const string ELEMENTO_IDE_EVENTO = "ideEvento";
+        private const string ELEMENTO_IND_RETIFICACAO = "indRetificacao";
+        private const string ELEMENTO_TP_AMB = "tpAmb";
+        private const string ELEMENTO_APLIC_EMI = "aplicEmi";
+        private const string ELEMENTO_VER_APLIC = "verAplic";
+        private const string ELEMENTO_NUMERO = "Numero";
 
         public string GerarXmlAbertura(DadosAbertura dados, string diretorioSaida)
         {
@@ -27,35 +46,35 @@ namespace ExemploAssinadorXML.Services
             string caminhoCompleto = Path.Combine(diretorioSaida, nomeArquivo);
 
             XmlDocument doc = new XmlDocument();
-            XmlDeclaration decl = doc.CreateXmlDeclaration("1.0", "utf-8", "no");
+            XmlDeclaration decl = doc.CreateXmlDeclaration("1.0", ENCODING_UTF8, "no");
             doc.AppendChild(decl);
 
             // Elemento raiz eFinanceira
-            XmlElement eFinanceiraRaiz = doc.CreateElement("eFinanceira", NAMESPACE_LOTE);
-            eFinanceiraRaiz.SetAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
-            eFinanceiraRaiz.SetAttribute("xmlns:xsd", "http://www.w3.org/2001/XMLSchema");
+            XmlElement eFinanceiraRaiz = doc.CreateElement(ELEMENTO_EFINANCEIRA, NAMESPACE_LOTE);
+            eFinanceiraRaiz.SetAttribute(ATTR_XMLNS_XSI, XMLNS_XSI_VALUE);
+            eFinanceiraRaiz.SetAttribute(ATTR_XMLNS_XSD, XMLNS_XSD_VALUE);
             doc.AppendChild(eFinanceiraRaiz);
 
             // loteEventosAssincrono (deve estar no mesmo namespace)
-            XmlElement loteEventosAssincrono = doc.CreateElement("loteEventosAssincrono", NAMESPACE_LOTE);
+            XmlElement loteEventosAssincrono = doc.CreateElement(ELEMENTO_LOTE_EVENTOS_ASSINCRONO, NAMESPACE_LOTE);
             eFinanceiraRaiz.AppendChild(loteEventosAssincrono);
 
             // cnpjDeclarante (deve estar no mesmo namespace)
-            XmlElement cnpjDeclaranteLote = doc.CreateElement("cnpjDeclarante", NAMESPACE_LOTE);
+            XmlElement cnpjDeclaranteLote = doc.CreateElement(ELEMENTO_CNPJ_DECLARANTE, NAMESPACE_LOTE);
             cnpjDeclaranteLote.InnerText = dados.CnpjDeclarante;
             loteEventosAssincrono.AppendChild(cnpjDeclaranteLote);
 
             // eventos (deve estar no mesmo namespace)
-            XmlElement eventos = doc.CreateElement("eventos", NAMESPACE_LOTE);
+            XmlElement eventos = doc.CreateElement(ELEMENTO_EVENTOS, NAMESPACE_LOTE);
             loteEventosAssincrono.AppendChild(eventos);
 
             // evento (deve estar no mesmo namespace)
-            XmlElement evento = doc.CreateElement("evento", NAMESPACE_LOTE);
+            XmlElement evento = doc.CreateElement(ELEMENTO_EVENTO, NAMESPACE_LOTE);
             evento.SetAttribute("id", "ID0");
             eventos.AppendChild(evento);
 
             // eFinanceira interno
-            XmlElement eFinanceiraInterno = doc.CreateElement("eFinanceira", NAMESPACE_EVENTO_ABERTURA);
+            XmlElement eFinanceiraInterno = doc.CreateElement(ELEMENTO_EFINANCEIRA, NAMESPACE_EVENTO_ABERTURA);
             evento.AppendChild(eFinanceiraInterno);
 
             // evtAberturaeFinanceira (deve estar no namespace do evento)
@@ -113,35 +132,35 @@ namespace ExemploAssinadorXML.Services
             string caminhoCompleto = Path.Combine(diretorioSaida, nomeArquivo);
 
             XmlDocument doc = new XmlDocument();
-            XmlDeclaration decl = doc.CreateXmlDeclaration("1.0", "utf-8", "no");
+            XmlDeclaration decl = doc.CreateXmlDeclaration("1.0", ENCODING_UTF8, "no");
             doc.AppendChild(decl);
 
             // Elemento raiz eFinanceira
-            XmlElement eFinanceiraRaiz = doc.CreateElement("eFinanceira", NAMESPACE_LOTE);
-            eFinanceiraRaiz.SetAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
-            eFinanceiraRaiz.SetAttribute("xmlns:xsd", "http://www.w3.org/2001/XMLSchema");
+            XmlElement eFinanceiraRaiz = doc.CreateElement(ELEMENTO_EFINANCEIRA, NAMESPACE_LOTE);
+            eFinanceiraRaiz.SetAttribute(ATTR_XMLNS_XSI, XMLNS_XSI_VALUE);
+            eFinanceiraRaiz.SetAttribute(ATTR_XMLNS_XSD, XMLNS_XSD_VALUE);
             doc.AppendChild(eFinanceiraRaiz);
 
             // loteEventosAssincrono (deve estar no mesmo namespace)
-            XmlElement loteEventosAssincrono = doc.CreateElement("loteEventosAssincrono", NAMESPACE_LOTE);
+            XmlElement loteEventosAssincrono = doc.CreateElement(ELEMENTO_LOTE_EVENTOS_ASSINCRONO, NAMESPACE_LOTE);
             eFinanceiraRaiz.AppendChild(loteEventosAssincrono);
 
             // cnpjDeclarante (deve estar no mesmo namespace)
-            XmlElement cnpjDeclaranteLote = doc.CreateElement("cnpjDeclarante", NAMESPACE_LOTE);
+            XmlElement cnpjDeclaranteLote = doc.CreateElement(ELEMENTO_CNPJ_DECLARANTE, NAMESPACE_LOTE);
             cnpjDeclaranteLote.InnerText = dados.CnpjDeclarante;
             loteEventosAssincrono.AppendChild(cnpjDeclaranteLote);
 
             // eventos (deve estar no mesmo namespace)
-            XmlElement eventos = doc.CreateElement("eventos", NAMESPACE_LOTE);
+            XmlElement eventos = doc.CreateElement(ELEMENTO_EVENTOS, NAMESPACE_LOTE);
             loteEventosAssincrono.AppendChild(eventos);
 
             // evento (deve estar no mesmo namespace)
-            XmlElement evento = doc.CreateElement("evento", NAMESPACE_LOTE);
+            XmlElement evento = doc.CreateElement(ELEMENTO_EVENTO, NAMESPACE_LOTE);
             evento.SetAttribute("id", "ID0");
             eventos.AppendChild(evento);
 
             // eFinanceira interno
-            XmlElement eFinanceiraInterno = doc.CreateElement("eFinanceira", NAMESPACE_EVENTO_FECHAMENTO);
+            XmlElement eFinanceiraInterno = doc.CreateElement(ELEMENTO_EFINANCEIRA, NAMESPACE_EVENTO_FECHAMENTO);
             evento.AppendChild(eFinanceiraInterno);
 
             // evtFechamentoeFinanceira (deve estar no namespace do evento)
@@ -193,12 +212,12 @@ namespace ExemploAssinadorXML.Services
             return caminhoCompleto;
         }
 
-        private void CriarIdeEvento(XmlDocument doc, XmlElement pai, DadosAbertura dados)
+        private static void CriarIdeEvento(XmlDocument doc, XmlElement pai, DadosAbertura dados)
         {
-            XmlElement ideEvento = doc.CreateElement("ideEvento", NAMESPACE_EVENTO_ABERTURA);
+            XmlElement ideEvento = doc.CreateElement(ELEMENTO_IDE_EVENTO, NAMESPACE_EVENTO_ABERTURA);
             pai.AppendChild(ideEvento);
 
-            XmlElement indRetificacao = doc.CreateElement("indRetificacao", NAMESPACE_EVENTO_ABERTURA);
+            XmlElement indRetificacao = doc.CreateElement(ELEMENTO_IND_RETIFICACAO, NAMESPACE_EVENTO_ABERTURA);
             indRetificacao.InnerText = dados.IndRetificacao.ToString();
             ideEvento.AppendChild(indRetificacao);
 
@@ -209,27 +228,27 @@ namespace ExemploAssinadorXML.Services
                 ideEvento.AppendChild(nrRecibo);
             }
 
-            XmlElement tpAmb = doc.CreateElement("tpAmb", NAMESPACE_EVENTO_ABERTURA);
+            XmlElement tpAmb = doc.CreateElement(ELEMENTO_TP_AMB, NAMESPACE_EVENTO_ABERTURA);
             tpAmb.InnerText = dados.TipoAmbiente.ToString();
             ideEvento.AppendChild(tpAmb);
 
-            XmlElement aplicEmi = doc.CreateElement("aplicEmi", NAMESPACE_EVENTO_ABERTURA);
+            XmlElement aplicEmi = doc.CreateElement(ELEMENTO_APLIC_EMI, NAMESPACE_EVENTO_ABERTURA);
             aplicEmi.InnerText = dados.AplicacaoEmissora.ToString();
             ideEvento.AppendChild(aplicEmi);
 
-            XmlElement verAplic = doc.CreateElement("verAplic", NAMESPACE_EVENTO_ABERTURA);
+            XmlElement verAplic = doc.CreateElement(ELEMENTO_VER_APLIC, NAMESPACE_EVENTO_ABERTURA);
             verAplic.InnerText = VERSAO_APLICATIVO;
             ideEvento.AppendChild(verAplic);
         }
 
-        private void CriarIdeEventoFechamento(XmlDocument doc, XmlElement pai, DadosFechamento dados)
+        private static void CriarIdeEventoFechamento(XmlDocument doc, XmlElement pai, DadosFechamento dados)
         {
             string namespaceEvento = pai.NamespaceURI;
             
-            XmlElement ideEvento = doc.CreateElement("ideEvento", namespaceEvento);
+            XmlElement ideEvento = doc.CreateElement(ELEMENTO_IDE_EVENTO, namespaceEvento);
             pai.AppendChild(ideEvento);
 
-            XmlElement indRetificacao = doc.CreateElement("indRetificacao", namespaceEvento);
+            XmlElement indRetificacao = doc.CreateElement(ELEMENTO_IND_RETIFICACAO, namespaceEvento);
             indRetificacao.InnerText = dados.IndRetificacao.ToString();
             ideEvento.AppendChild(indRetificacao);
 
@@ -240,20 +259,20 @@ namespace ExemploAssinadorXML.Services
                 ideEvento.AppendChild(nrRecibo);
             }
 
-            XmlElement tpAmb = doc.CreateElement("tpAmb", namespaceEvento);
+            XmlElement tpAmb = doc.CreateElement(ELEMENTO_TP_AMB, namespaceEvento);
             tpAmb.InnerText = dados.TipoAmbiente.ToString();
             ideEvento.AppendChild(tpAmb);
 
-            XmlElement aplicEmi = doc.CreateElement("aplicEmi", namespaceEvento);
+            XmlElement aplicEmi = doc.CreateElement(ELEMENTO_APLIC_EMI, namespaceEvento);
             aplicEmi.InnerText = dados.AplicacaoEmissora.ToString();
             ideEvento.AppendChild(aplicEmi);
 
-            XmlElement verAplic = doc.CreateElement("verAplic", namespaceEvento);
+            XmlElement verAplic = doc.CreateElement(ELEMENTO_VER_APLIC, namespaceEvento);
             verAplic.InnerText = VERSAO_APLICATIVO;
             ideEvento.AppendChild(verAplic);
         }
 
-        private void CriarIdeDeclarante(XmlDocument doc, XmlElement pai, string cnpj)
+        private static void CriarIdeDeclarante(XmlDocument doc, XmlElement pai, string cnpj)
         {
             // Verificar o namespace do elemento pai para usar o mesmo namespace
             string namespaceEvento = pai.NamespaceURI;
@@ -266,7 +285,7 @@ namespace ExemploAssinadorXML.Services
             ideDeclarante.AppendChild(cnpjDeclarante);
         }
 
-        private void CriarInfoAbertura(XmlDocument doc, XmlElement pai, DadosAbertura dados)
+        private static void CriarInfoAbertura(XmlDocument doc, XmlElement pai, DadosAbertura dados)
         {
             XmlElement infoAbertura = doc.CreateElement("infoAbertura", NAMESPACE_EVENTO_ABERTURA);
             pai.AppendChild(infoAbertura);
@@ -301,7 +320,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private void CriarResponsavelRMF(XmlDocument doc, XmlElement pai, DadosResponsavelRMF dados)
+        private static void CriarResponsavelRMF(XmlDocument doc, XmlElement pai, DadosResponsavelRMF dados)
         {
             string namespaceEvento = pai.NamespaceURI;
             
@@ -332,7 +351,7 @@ namespace ExemploAssinadorXML.Services
             ddd.InnerText = dados.TelefoneDDD;
             telefone.AppendChild(ddd);
 
-            XmlElement numero = doc.CreateElement("Numero", namespaceEvento);
+            XmlElement numero = doc.CreateElement(ELEMENTO_NUMERO, namespaceEvento);
             numero.InnerText = dados.TelefoneNumero;
             telefone.AppendChild(numero);
 
@@ -351,7 +370,7 @@ namespace ExemploAssinadorXML.Services
             logradouro.InnerText = dados.EnderecoLogradouro;
             endereco.AppendChild(logradouro);
 
-            XmlElement numeroEndereco = doc.CreateElement("Numero", namespaceEvento);
+            XmlElement numeroEndereco = doc.CreateElement(ELEMENTO_NUMERO, namespaceEvento);
             numeroEndereco.InnerText = dados.EnderecoNumero;
             endereco.AppendChild(numeroEndereco);
 
@@ -379,7 +398,7 @@ namespace ExemploAssinadorXML.Services
             endereco.AppendChild(uf);
         }
 
-        private void CriarRespeFin(XmlDocument doc, XmlElement pai, DadosRespeFin dados)
+        private static void CriarRespeFin(XmlDocument doc, XmlElement pai, DadosRespeFin dados)
         {
             string namespaceEvento = pai.NamespaceURI;
             
@@ -406,7 +425,7 @@ namespace ExemploAssinadorXML.Services
             ddd.InnerText = dados.TelefoneDDD;
             telefone.AppendChild(ddd);
 
-            XmlElement numero = doc.CreateElement("Numero", namespaceEvento);
+            XmlElement numero = doc.CreateElement(ELEMENTO_NUMERO, namespaceEvento);
             numero.InnerText = dados.TelefoneNumero;
             telefone.AppendChild(numero);
 
@@ -425,7 +444,7 @@ namespace ExemploAssinadorXML.Services
             logradouro.InnerText = dados.EnderecoLogradouro;
             endereco.AppendChild(logradouro);
 
-            XmlElement numeroEndereco = doc.CreateElement("Numero", namespaceEvento);
+            XmlElement numeroEndereco = doc.CreateElement(ELEMENTO_NUMERO, namespaceEvento);
             numeroEndereco.InnerText = dados.EnderecoNumero;
             endereco.AppendChild(numeroEndereco);
 
@@ -457,7 +476,7 @@ namespace ExemploAssinadorXML.Services
             respeFin.AppendChild(email);
         }
 
-        private void CriarRepresLegal(XmlDocument doc, XmlElement pai, DadosRepresLegal dados)
+        private static void CriarRepresLegal(XmlDocument doc, XmlElement pai, DadosRepresLegal dados)
         {
             string namespaceEvento = pai.NamespaceURI;
             
@@ -480,7 +499,7 @@ namespace ExemploAssinadorXML.Services
             ddd.InnerText = dados.TelefoneDDD;
             telefone.AppendChild(ddd);
 
-            XmlElement numero = doc.CreateElement("Numero", namespaceEvento);
+            XmlElement numero = doc.CreateElement(ELEMENTO_NUMERO, namespaceEvento);
             numero.InnerText = dados.TelefoneNumero;
             telefone.AppendChild(numero);
 
@@ -492,7 +511,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private void CriarAberturaPP(XmlDocument doc, XmlElement pai, string[] tiposEmpresaPP)
+        private static void CriarAberturaPP(XmlDocument doc, XmlElement pai, string[] tiposEmpresaPP)
         {
             XmlElement aberturaPP = doc.CreateElement("AberturaPP", NAMESPACE_EVENTO_ABERTURA);
             pai.AppendChild(aberturaPP);
@@ -508,7 +527,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private void CriarInfoFechamento(XmlDocument doc, XmlElement pai, DadosFechamento dados)
+        private static void CriarInfoFechamento(XmlDocument doc, XmlElement pai, DadosFechamento dados)
         {
             string namespaceEvento = pai.NamespaceURI;
             
@@ -535,7 +554,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private void CriarFechamentoPP(XmlDocument doc, XmlElement pai, int fechamentoPP)
+        private static void CriarFechamentoPP(XmlDocument doc, XmlElement pai, int fechamentoPP)
         {
             string namespaceEvento = pai.NamespaceURI;
             
@@ -547,7 +566,7 @@ namespace ExemploAssinadorXML.Services
             fechamentoPPElement.AppendChild(fechamentoPPValue);
         }
 
-        private void CriarFechamentoMovOpFin(XmlDocument doc, XmlElement pai, DadosFechamento dados)
+        private static void CriarFechamentoMovOpFin(XmlDocument doc, XmlElement pai, DadosFechamento dados)
         {
             string namespaceEvento = pai.NamespaceURI;
             
@@ -607,7 +626,7 @@ namespace ExemploAssinadorXML.Services
             }
         }
 
-        private void CriarFechamentoMovOpFinAnual(XmlDocument doc, XmlElement pai, int fechamentoMovOpFinAnual)
+        private static void CriarFechamentoMovOpFinAnual(XmlDocument doc, XmlElement pai, int fechamentoMovOpFinAnual)
         {
             string namespaceEvento = pai.NamespaceURI;
             
@@ -637,26 +656,26 @@ namespace ExemploAssinadorXML.Services
             string caminhoCompleto = Path.Combine(diretorioSaida, nomeArquivo);
 
             XmlDocument doc = new XmlDocument();
-            XmlDeclaration decl = doc.CreateXmlDeclaration("1.0", "utf-8", "no");
+            XmlDeclaration decl = doc.CreateXmlDeclaration("1.0", ENCODING_UTF8, "no");
             doc.AppendChild(decl);
 
             // Elemento raiz eFinanceira
-            XmlElement eFinanceiraRaiz = doc.CreateElement("eFinanceira", NAMESPACE_LOTE);
-            eFinanceiraRaiz.SetAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
-            eFinanceiraRaiz.SetAttribute("xmlns:xsd", "http://www.w3.org/2001/XMLSchema");
+            XmlElement eFinanceiraRaiz = doc.CreateElement(ELEMENTO_EFINANCEIRA, NAMESPACE_LOTE);
+            eFinanceiraRaiz.SetAttribute(ATTR_XMLNS_XSI, XMLNS_XSI_VALUE);
+            eFinanceiraRaiz.SetAttribute(ATTR_XMLNS_XSD, XMLNS_XSD_VALUE);
             doc.AppendChild(eFinanceiraRaiz);
 
             // loteEventosAssincrono (deve estar no mesmo namespace)
-            XmlElement loteEventosAssincrono = doc.CreateElement("loteEventosAssincrono", NAMESPACE_LOTE);
+            XmlElement loteEventosAssincrono = doc.CreateElement(ELEMENTO_LOTE_EVENTOS_ASSINCRONO, NAMESPACE_LOTE);
             eFinanceiraRaiz.AppendChild(loteEventosAssincrono);
 
             // cnpjDeclarante (deve estar no mesmo namespace)
-            XmlElement cnpjDeclaranteLote = doc.CreateElement("cnpjDeclarante", NAMESPACE_LOTE);
+            XmlElement cnpjDeclaranteLote = doc.CreateElement(ELEMENTO_CNPJ_DECLARANTE, NAMESPACE_LOTE);
             cnpjDeclaranteLote.InnerText = cnpjDeclarante;
             loteEventosAssincrono.AppendChild(cnpjDeclaranteLote);
 
             // eventos (deve estar no mesmo namespace)
-            XmlElement eventos = doc.CreateElement("eventos", NAMESPACE_LOTE);
+            XmlElement eventos = doc.CreateElement(ELEMENTO_EVENTOS, NAMESPACE_LOTE);
             loteEventosAssincrono.AppendChild(eventos);
 
             // Criar eventos para cada pessoa (aplicar offset se necessário)
@@ -687,7 +706,7 @@ namespace ExemploAssinadorXML.Services
                 eventos.AppendChild(evento);
 
                 // eFinanceira interno
-                XmlElement eFinanceiraInterno = doc.CreateElement("eFinanceira", NAMESPACE_EVENTO_MOV);
+                XmlElement eFinanceiraInterno = doc.CreateElement(ELEMENTO_EFINANCEIRA, NAMESPACE_EVENTO_MOV);
                 evento.AppendChild(eFinanceiraInterno);
 
                 // evtMovOpFin
@@ -723,22 +742,22 @@ namespace ExemploAssinadorXML.Services
             eFinanceiraInterno.AppendChild(evtMovOpFin);
 
             // ideEvento
-            XmlElement ideEvento = doc.CreateElement("ideEvento", NAMESPACE_EVENTO_MOV);
+            XmlElement ideEvento = doc.CreateElement(ELEMENTO_IDE_EVENTO, NAMESPACE_EVENTO_MOV);
             evtMovOpFin.AppendChild(ideEvento);
 
-            XmlElement indRetificacao = doc.CreateElement("indRetificacao", NAMESPACE_EVENTO_MOV);
+            XmlElement indRetificacao = doc.CreateElement(ELEMENTO_IND_RETIFICACAO, NAMESPACE_EVENTO_MOV);
             indRetificacao.InnerText = "1"; // Original
             ideEvento.AppendChild(indRetificacao);
 
-            XmlElement tpAmb = doc.CreateElement("tpAmb", NAMESPACE_EVENTO_MOV);
+            XmlElement tpAmb = doc.CreateElement(ELEMENTO_TP_AMB, NAMESPACE_EVENTO_MOV);
             tpAmb.InnerText = tipoAmbiente.ToString();
             ideEvento.AppendChild(tpAmb);
 
-            XmlElement aplicEmi = doc.CreateElement("aplicEmi", NAMESPACE_EVENTO_MOV);
+            XmlElement aplicEmi = doc.CreateElement(ELEMENTO_APLIC_EMI, NAMESPACE_EVENTO_MOV);
             aplicEmi.InnerText = "1"; // Aplicativo da empresa
             ideEvento.AppendChild(aplicEmi);
 
-            XmlElement verAplic = doc.CreateElement("verAplic", NAMESPACE_EVENTO_MOV);
+            XmlElement verAplic = doc.CreateElement(ELEMENTO_VER_APLIC, NAMESPACE_EVENTO_MOV);
             verAplic.InnerText = VERSAO_APLICATIVO;
             ideEvento.AppendChild(verAplic);
 
@@ -879,7 +898,7 @@ namespace ExemploAssinadorXML.Services
             pgtosAcum.AppendChild(totPgtosAcum);
         }
 
-        private string FormatIdEvento(long idPessoa)
+        private static string FormatIdEvento(long idPessoa)
         {
             string sequencial = idPessoa.ToString().PadLeft(18, '0');
             if (sequencial.Length > 18)
@@ -889,7 +908,7 @@ namespace ExemploAssinadorXML.Services
             return "ID" + sequencial;
         }
 
-        private string NormalizarCodigoPais(string nacionalidade)
+        private static string NormalizarCodigoPais(string nacionalidade)
         {
             if (string.IsNullOrWhiteSpace(nacionalidade))
             {
@@ -915,13 +934,13 @@ namespace ExemploAssinadorXML.Services
             return "BR";
         }
 
-        private string NormalizarCpf(string cpf)
+        private static string NormalizarCpf(string cpf)
         {
             if (string.IsNullOrEmpty(cpf)) return "";
             return cpf.Replace(".", "").Replace("-", "").Trim();
         }
 
-        private string ConstruirEnderecoLivre(DadosPessoaConta pessoa)
+        private static string ConstruirEnderecoLivre(DadosPessoaConta pessoa)
         {
             if (string.IsNullOrEmpty(pessoa.EnderecoLivre))
             {
@@ -938,7 +957,7 @@ namespace ExemploAssinadorXML.Services
             return pessoa.EnderecoLivre;
         }
 
-        private string ConstruirNumeroConta(DadosPessoaConta pessoa)
+        private static string ConstruirNumeroConta(DadosPessoaConta pessoa)
         {
             string numConta = pessoa.NumeroConta;
             if (!string.IsNullOrEmpty(pessoa.DigitoConta))
@@ -948,14 +967,390 @@ namespace ExemploAssinadorXML.Services
             return numConta;
         }
 
-        private string FormatarValorMonetario(decimal valor)
+        private static string FormatarValorMonetario(decimal valor)
         {
             // Formata sem separador de milhar, apenas com vírgula como decimal (como no Java)
             // Exemplo: 18000.00 -> "18000,00" (não "18.000,00")
             return valor.ToString("0.00", System.Globalization.CultureInfo.GetCultureInfo("en-US")).Replace(".", ",");
         }
 
-        private string GerarIdEvento()
+        public string GerarXmlCadastroDeclarante(DadosCadastroDeclarante dados, string diretorioSaida)
+        {
+            if (!Directory.Exists(diretorioSaida))
+            {
+                Directory.CreateDirectory(diretorioSaida);
+            }
+
+            string idEvento = GerarIdEvento();
+            string nomeArquivo = $"cadastro-declarante-{dados.CnpjDeclarante}_{DateTime.Now:yyyyMMdd_HHmmss}.xml";
+            string caminhoCompleto = Path.Combine(diretorioSaida, nomeArquivo);
+
+            XmlDocument doc = new XmlDocument();
+            XmlDeclaration decl = doc.CreateXmlDeclaration("1.0", ENCODING_UTF8, "no");
+            doc.AppendChild(decl);
+
+            // Elemento raiz eFinanceira
+            XmlElement eFinanceiraRaiz = doc.CreateElement(ELEMENTO_EFINANCEIRA, NAMESPACE_LOTE);
+            eFinanceiraRaiz.SetAttribute(ATTR_XMLNS_XSI, XMLNS_XSI_VALUE);
+            eFinanceiraRaiz.SetAttribute(ATTR_XMLNS_XSD, XMLNS_XSD_VALUE);
+            doc.AppendChild(eFinanceiraRaiz);
+
+            // loteEventosAssincrono
+            XmlElement loteEventosAssincrono = doc.CreateElement("loteEventosAssincrono", NAMESPACE_LOTE);
+            eFinanceiraRaiz.AppendChild(loteEventosAssincrono);
+
+            // cnpjDeclarante
+            XmlElement cnpjDeclaranteLote = doc.CreateElement("cnpjDeclarante", NAMESPACE_LOTE);
+            cnpjDeclaranteLote.InnerText = dados.CnpjDeclarante;
+            loteEventosAssincrono.AppendChild(cnpjDeclaranteLote);
+
+            // eventos
+            XmlElement eventos = doc.CreateElement("eventos", NAMESPACE_LOTE);
+            loteEventosAssincrono.AppendChild(eventos);
+
+            // evento
+            XmlElement evento = doc.CreateElement("evento", NAMESPACE_LOTE);
+            evento.SetAttribute("id", "ID0");
+            eventos.AppendChild(evento);
+
+            // eFinanceira interno
+            XmlElement eFinanceiraInterno = doc.CreateElement(ELEMENTO_EFINANCEIRA, NAMESPACE_EVENTO_CADASTRO);
+            evento.AppendChild(eFinanceiraInterno);
+
+            // evtCadDeclarante
+            XmlElement evtCadDeclarante = doc.CreateElement("evtCadDeclarante", NAMESPACE_EVENTO_CADASTRO);
+            evtCadDeclarante.SetAttribute("id", idEvento);
+            eFinanceiraInterno.AppendChild(evtCadDeclarante);
+
+            // ideEvento
+            CriarIdeEventoCadastro(doc, evtCadDeclarante, dados);
+            
+            // ideDeclarante
+            CriarIdeDeclarante(doc, evtCadDeclarante, dados.CnpjDeclarante);
+            
+            // infoCadastro
+            CriarInfoCadastro(doc, evtCadDeclarante, dados);
+
+            // Salvar
+            XmlWriterSettings settings = new XmlWriterSettings
+            {
+                Indent = true,
+                IndentChars = "  ",
+                Encoding = Encoding.UTF8,
+                OmitXmlDeclaration = false
+            };
+
+            using (XmlWriter writer = XmlWriter.Create(caminhoCompleto, settings))
+            {
+                doc.Save(writer);
+            }
+
+            return caminhoCompleto;
+        }
+
+        private static void CriarIdeEventoCadastro(XmlDocument doc, XmlElement pai, DadosCadastroDeclarante dados)
+        {
+            XmlElement ideEvento = doc.CreateElement(ELEMENTO_IDE_EVENTO, NAMESPACE_EVENTO_CADASTRO);
+            pai.AppendChild(ideEvento);
+
+            XmlElement indRetificacao = doc.CreateElement(ELEMENTO_IND_RETIFICACAO, NAMESPACE_EVENTO_CADASTRO);
+            indRetificacao.InnerText = dados.IndRetificacao.ToString();
+            ideEvento.AppendChild(indRetificacao);
+
+            if ((dados.IndRetificacao == 2 || dados.IndRetificacao == 3) && !string.IsNullOrEmpty(dados.NrRecibo))
+            {
+                XmlElement nrRecibo = doc.CreateElement("nrRecibo", NAMESPACE_EVENTO_CADASTRO);
+                nrRecibo.InnerText = dados.NrRecibo;
+                ideEvento.AppendChild(nrRecibo);
+            }
+
+            XmlElement tpAmb = doc.CreateElement(ELEMENTO_TP_AMB, NAMESPACE_EVENTO_CADASTRO);
+            tpAmb.InnerText = dados.TipoAmbiente.ToString();
+            ideEvento.AppendChild(tpAmb);
+
+            XmlElement aplicEmi = doc.CreateElement(ELEMENTO_APLIC_EMI, NAMESPACE_EVENTO_CADASTRO);
+            aplicEmi.InnerText = dados.AplicacaoEmissora.ToString();
+            ideEvento.AppendChild(aplicEmi);
+
+            XmlElement verAplic = doc.CreateElement(ELEMENTO_VER_APLIC, NAMESPACE_EVENTO_CADASTRO);
+            verAplic.InnerText = VERSAO_APLICATIVO;
+            ideEvento.AppendChild(verAplic);
+        }
+
+        private static void CriarInfoCadastro(XmlDocument doc, XmlElement pai, DadosCadastroDeclarante dados)
+        {
+            XmlElement infoCadastro = doc.CreateElement("infoCadastro", NAMESPACE_EVENTO_CADASTRO);
+            pai.AppendChild(infoCadastro);
+
+            CriarElementosOpcionaisIniciais(doc, infoCadastro, dados);
+            CriarElementosObrigatoriosBasicos(doc, infoCadastro, dados);
+            CriarPaisResid(doc, infoCadastro, dados);
+            CriarEnderecosOutros(doc, infoCadastro, dados);
+        }
+
+        private static void CriarElementosOpcionaisIniciais(XmlDocument doc, XmlElement infoCadastro, DadosCadastroDeclarante dados)
+        {
+            // GIIN (opcional)
+            if (!string.IsNullOrWhiteSpace(dados.GIIN))
+            {
+                XmlElement giin = doc.CreateElement("GIIN", NAMESPACE_EVENTO_CADASTRO);
+                giin.InnerText = dados.GIIN;
+                infoCadastro.AppendChild(giin);
+            }
+
+            // CategoriaDeclarante (opcional)
+            if (!string.IsNullOrWhiteSpace(dados.CategoriaDeclarante))
+            {
+                XmlElement categoriaDeclarante = doc.CreateElement("CategoriaDeclarante", NAMESPACE_EVENTO_CADASTRO);
+                categoriaDeclarante.InnerText = dados.CategoriaDeclarante;
+                infoCadastro.AppendChild(categoriaDeclarante);
+            }
+
+            // infoTpInstPgto (opcional)
+            if (dados.TiposInstPgto != null && dados.TiposInstPgto.Count > 0)
+            {
+                foreach (var tipoInstPgto in dados.TiposInstPgto)
+                {
+                    XmlElement infoTpInstPgto = doc.CreateElement("infoTpInstPgto", NAMESPACE_EVENTO_CADASTRO);
+                    infoCadastro.AppendChild(infoTpInstPgto);
+
+                    XmlElement tpInstPgto = doc.CreateElement("tpInstPgto", NAMESPACE_EVENTO_CADASTRO);
+                    tpInstPgto.InnerText = tipoInstPgto.TpInstPgto;
+                    infoTpInstPgto.AppendChild(tpInstPgto);
+                }
+            }
+
+            // NIF (opcional)
+            if (dados.NIFs != null && dados.NIFs.Count > 0)
+            {
+                foreach (var nif in dados.NIFs)
+                {
+                    XmlElement nifElement = doc.CreateElement("NIF", NAMESPACE_EVENTO_CADASTRO);
+                    infoCadastro.AppendChild(nifElement);
+
+                    XmlElement numeroNIF = doc.CreateElement("NumeroNIF", NAMESPACE_EVENTO_CADASTRO);
+                    numeroNIF.InnerText = nif.NumeroNIF;
+                    nifElement.AppendChild(numeroNIF);
+
+                    XmlElement paisEmissao = doc.CreateElement("PaisEmissao", NAMESPACE_EVENTO_CADASTRO);
+                    paisEmissao.InnerText = nif.PaisEmissao;
+                    nifElement.AppendChild(paisEmissao);
+
+                    if (!string.IsNullOrWhiteSpace(nif.TpNIF))
+                    {
+                        XmlElement tpNIF = doc.CreateElement("tpNIF", NAMESPACE_EVENTO_CADASTRO);
+                        tpNIF.InnerText = nif.TpNIF;
+                        nifElement.AppendChild(tpNIF);
+                    }
+                }
+            }
+        }
+
+        private static void CriarElementosObrigatoriosBasicos(XmlDocument doc, XmlElement infoCadastro, DadosCadastroDeclarante dados)
+        {
+            // Nome (obrigatório)
+            XmlElement nome = doc.CreateElement("nome", NAMESPACE_EVENTO_CADASTRO);
+            nome.InnerText = dados.Nome;
+            infoCadastro.AppendChild(nome);
+
+            // TpNome (opcional)
+            if (!string.IsNullOrWhiteSpace(dados.TpNome))
+            {
+                XmlElement tpNome = doc.CreateElement("tpNome", NAMESPACE_EVENTO_CADASTRO);
+                tpNome.InnerText = dados.TpNome;
+                infoCadastro.AppendChild(tpNome);
+            }
+
+            // EnderecoLivre (obrigatório)
+            XmlElement enderecoLivre = doc.CreateElement("enderecoLivre", NAMESPACE_EVENTO_CADASTRO);
+            enderecoLivre.InnerText = dados.EnderecoLivre;
+            infoCadastro.AppendChild(enderecoLivre);
+
+            // TpEndereco (opcional)
+            if (!string.IsNullOrWhiteSpace(dados.TpEndereco))
+            {
+                XmlElement tpEndereco = doc.CreateElement("tpEndereco", NAMESPACE_EVENTO_CADASTRO);
+                tpEndereco.InnerText = dados.TpEndereco;
+                infoCadastro.AppendChild(tpEndereco);
+            }
+
+            // Municipio (obrigatório)
+            XmlElement municipio = doc.CreateElement("municipio", NAMESPACE_EVENTO_CADASTRO);
+            municipio.InnerText = dados.Municipio;
+            infoCadastro.AppendChild(municipio);
+
+            // UF (obrigatório)
+            XmlElement uf = doc.CreateElement("UF", NAMESPACE_EVENTO_CADASTRO);
+            uf.InnerText = dados.UF;
+            infoCadastro.AppendChild(uf);
+
+            // CEP (obrigatório)
+            XmlElement cep = doc.CreateElement("CEP", NAMESPACE_EVENTO_CADASTRO);
+            cep.InnerText = dados.CEP;
+            infoCadastro.AppendChild(cep);
+
+            // Pais (obrigatório)
+            XmlElement pais = doc.CreateElement("Pais", NAMESPACE_EVENTO_CADASTRO);
+            pais.InnerText = dados.Pais;
+            infoCadastro.AppendChild(pais);
+        }
+
+        private static void CriarPaisResid(XmlDocument doc, XmlElement infoCadastro, DadosCadastroDeclarante dados)
+        {
+            // paisResid (obrigatório - deve conter pelo menos "BR")
+            if (dados.PaisResid != null && dados.PaisResid.Count > 0)
+            {
+                foreach (var paisResid in dados.PaisResid)
+                {
+                    XmlElement paisResidElement = doc.CreateElement("paisResid", NAMESPACE_EVENTO_CADASTRO);
+                    infoCadastro.AppendChild(paisResidElement);
+
+                    XmlElement paisElement = doc.CreateElement("Pais", NAMESPACE_EVENTO_CADASTRO);
+                    paisElement.InnerText = paisResid;
+                    paisResidElement.AppendChild(paisElement);
+                }
+            }
+            else
+            {
+                // Se não houver, adicionar "BR" por padrão
+                XmlElement paisResidElement = doc.CreateElement("paisResid", NAMESPACE_EVENTO_CADASTRO);
+                infoCadastro.AppendChild(paisResidElement);
+
+                XmlElement paisElement = doc.CreateElement("Pais", NAMESPACE_EVENTO_CADASTRO);
+                paisElement.InnerText = "BR";
+                paisResidElement.AppendChild(paisElement);
+            }
+        }
+
+        private static void CriarEnderecosOutros(XmlDocument doc, XmlElement infoCadastro, DadosCadastroDeclarante dados)
+        {
+            // EnderecoOutros (opcional)
+            if (dados.EnderecosOutros == null || dados.EnderecosOutros.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var enderecoOutros in dados.EnderecosOutros)
+            {
+                XmlElement enderecoOutrosElement = doc.CreateElement("EnderecoOutros", NAMESPACE_EVENTO_CADASTRO);
+                infoCadastro.AppendChild(enderecoOutrosElement);
+
+                if (!string.IsNullOrWhiteSpace(enderecoOutros.TpEndereco))
+                {
+                    XmlElement tpEnderecoOutros = doc.CreateElement("tpEndereco", NAMESPACE_EVENTO_CADASTRO);
+                    tpEnderecoOutros.InnerText = enderecoOutros.TpEndereco;
+                    enderecoOutrosElement.AppendChild(tpEnderecoOutros);
+                }
+
+                if (!string.IsNullOrWhiteSpace(enderecoOutros.EnderecoLivre))
+                {
+                    XmlElement enderecoLivreOutros = doc.CreateElement("EnderecoLivre", NAMESPACE_EVENTO_CADASTRO);
+                    enderecoLivreOutros.InnerText = enderecoOutros.EnderecoLivre;
+                    enderecoOutrosElement.AppendChild(enderecoLivreOutros);
+                }
+
+                if (enderecoOutros.EnderecoEstrutura != null)
+                {
+                    CriarEnderecoEstrutura(doc, enderecoOutrosElement, enderecoOutros.EnderecoEstrutura);
+                }
+
+                if (!string.IsNullOrWhiteSpace(enderecoOutros.Pais))
+                {
+                    XmlElement paisOutros = doc.CreateElement("Pais", NAMESPACE_EVENTO_CADASTRO);
+                    paisOutros.InnerText = enderecoOutros.Pais;
+                    enderecoOutrosElement.AppendChild(paisOutros);
+                }
+            }
+        }
+
+        private static void CriarEnderecoEstrutura(XmlDocument doc, XmlElement enderecoOutrosElement, DadosEnderecoEstrutura enderecoEstrutura)
+        {
+            XmlElement enderecoEstruturaElement = doc.CreateElement("EnderecoEstrutura", NAMESPACE_EVENTO_CADASTRO);
+            enderecoOutrosElement.AppendChild(enderecoEstruturaElement);
+
+            if (!string.IsNullOrWhiteSpace(enderecoEstrutura.EnderecoLivre))
+            {
+                XmlElement enderecoLivreEstrutura = doc.CreateElement("EnderecoLivre", NAMESPACE_EVENTO_CADASTRO);
+                enderecoLivreEstrutura.InnerText = enderecoEstrutura.EnderecoLivre;
+                enderecoEstruturaElement.AppendChild(enderecoLivreEstrutura);
+            }
+
+            if (enderecoEstrutura.Endereco != null)
+            {
+                CriarEnderecoDetalhado(doc, enderecoEstruturaElement, enderecoEstrutura.Endereco);
+            }
+
+            if (!string.IsNullOrWhiteSpace(enderecoEstrutura.CEP))
+            {
+                XmlElement cepEstrutura = doc.CreateElement("CEP", NAMESPACE_EVENTO_CADASTRO);
+                cepEstrutura.InnerText = enderecoEstrutura.CEP;
+                enderecoEstruturaElement.AppendChild(cepEstrutura);
+            }
+
+            if (!string.IsNullOrWhiteSpace(enderecoEstrutura.Municipio))
+            {
+                XmlElement municipioEstrutura = doc.CreateElement("Município", NAMESPACE_EVENTO_CADASTRO);
+                municipioEstrutura.InnerText = enderecoEstrutura.Municipio;
+                enderecoEstruturaElement.AppendChild(municipioEstrutura);
+            }
+
+            if (!string.IsNullOrWhiteSpace(enderecoEstrutura.UF))
+            {
+                XmlElement ufEstrutura = doc.CreateElement("UF", NAMESPACE_EVENTO_CADASTRO);
+                ufEstrutura.InnerText = enderecoEstrutura.UF;
+                enderecoEstruturaElement.AppendChild(ufEstrutura);
+            }
+        }
+
+        private static void CriarEnderecoDetalhado(XmlDocument doc, XmlElement enderecoEstruturaElement, DadosEndereco endereco)
+        {
+            XmlElement enderecoElement = doc.CreateElement("Endereco", NAMESPACE_EVENTO_CADASTRO);
+            enderecoEstruturaElement.AppendChild(enderecoElement);
+
+            if (!string.IsNullOrWhiteSpace(endereco.Logradouro))
+            {
+                XmlElement logradouro = doc.CreateElement("Logradouro", NAMESPACE_EVENTO_CADASTRO);
+                logradouro.InnerText = endereco.Logradouro;
+                enderecoElement.AppendChild(logradouro);
+            }
+
+            if (!string.IsNullOrWhiteSpace(endereco.Numero))
+            {
+                XmlElement numero = doc.CreateElement(ELEMENTO_NUMERO, NAMESPACE_EVENTO_CADASTRO);
+                numero.InnerText = endereco.Numero;
+                enderecoElement.AppendChild(numero);
+            }
+
+            if (!string.IsNullOrWhiteSpace(endereco.Complemento))
+            {
+                XmlElement complemento = doc.CreateElement("Complemento", NAMESPACE_EVENTO_CADASTRO);
+                complemento.InnerText = endereco.Complemento;
+                enderecoElement.AppendChild(complemento);
+            }
+
+            if (!string.IsNullOrWhiteSpace(endereco.Andar))
+            {
+                XmlElement andar = doc.CreateElement("Andar", NAMESPACE_EVENTO_CADASTRO);
+                andar.InnerText = endereco.Andar;
+                enderecoElement.AppendChild(andar);
+            }
+
+            if (!string.IsNullOrWhiteSpace(endereco.Bairro))
+            {
+                XmlElement bairro = doc.CreateElement("Bairro", NAMESPACE_EVENTO_CADASTRO);
+                bairro.InnerText = endereco.Bairro;
+                enderecoElement.AppendChild(bairro);
+            }
+
+            if (!string.IsNullOrWhiteSpace(endereco.CaixaPostal))
+            {
+                XmlElement caixaPostal = doc.CreateElement("CaixaPostal", NAMESPACE_EVENTO_CADASTRO);
+                caixaPostal.InnerText = endereco.CaixaPostal;
+                enderecoElement.AppendChild(caixaPostal);
+            }
+        }
+
+        private static string GerarIdEvento()
         {
             long timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             string sequencial = timestamp.ToString().PadLeft(18, '0');

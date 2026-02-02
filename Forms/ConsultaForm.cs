@@ -22,9 +22,14 @@ namespace ExemploAssinadorXML.Forms
         private ListBox lstLotes;
         private Button btnAtualizarLotes;
         private Button btnGerarFechamento;
-        private DateTimePicker dtpFiltroData;
-        private Label lblFiltroData;
+        private DateTimePicker dtpFiltroDataInicio;
+        private DateTimePicker dtpFiltroDataFim;
+        private Label lblFiltroDataInicio;
+        private Label lblFiltroDataFim;
         private CheckBox chkUsarFiltroData;
+        private CheckBox chkUsarFiltroPeriodo;
+        private TextBox txtFiltroPeriodo;
+        private Label lblFiltroPeriodo;
 
         private GroupBox grpDetalhes;
         private RichTextBox rtbDetalhes;
@@ -78,37 +83,96 @@ namespace ExemploAssinadorXML.Forms
             grpLotes = new GroupBox();
             grpLotes.Text = "Lotes Processados";
             grpLotes.Location = new Point(10, 170);
-            grpLotes.Size = new Size(350, 350);
+            grpLotes.Size = new Size(350, 420);
             grpLotes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+
+            int yPos = 25;
 
             // Filtro de data
             chkUsarFiltroData = new CheckBox();
             chkUsarFiltroData.Text = "Filtrar por data";
-            chkUsarFiltroData.Location = new Point(10, 25);
+            chkUsarFiltroData.Location = new Point(10, yPos);
             chkUsarFiltroData.Size = new Size(120, 20);
-            chkUsarFiltroData.Checked = true; // Por padrão, filtrar por hoje
+            chkUsarFiltroData.Checked = false; // Por padrão, não filtrar por data
 
-            lblFiltroData = new Label();
-            lblFiltroData.Text = "Data:";
-            lblFiltroData.Location = new Point(10, 50);
-            lblFiltroData.Size = new Size(50, 20);
+            yPos += 25;
 
-            dtpFiltroData = new DateTimePicker();
-            dtpFiltroData.Location = new Point(65, 47);
-            dtpFiltroData.Size = new Size(120, 23);
-            dtpFiltroData.Format = DateTimePickerFormat.Short;
-            dtpFiltroData.Value = DateTime.Today;
-            dtpFiltroData.Enabled = chkUsarFiltroData.Checked;
-            chkUsarFiltroData.CheckedChanged += (s, e) => dtpFiltroData.Enabled = chkUsarFiltroData.Checked;
+            lblFiltroDataInicio = new Label();
+            lblFiltroDataInicio.Text = "Data Início:";
+            lblFiltroDataInicio.Location = new Point(10, yPos);
+            lblFiltroDataInicio.Size = new Size(70, 20);
+            lblFiltroDataInicio.Enabled = chkUsarFiltroData.Checked;
+
+            dtpFiltroDataInicio = new DateTimePicker();
+            dtpFiltroDataInicio.Location = new Point(85, yPos - 3);
+            dtpFiltroDataInicio.Size = new Size(110, 23);
+            dtpFiltroDataInicio.Format = DateTimePickerFormat.Short;
+            dtpFiltroDataInicio.Value = DateTime.Today;
+            dtpFiltroDataInicio.Enabled = chkUsarFiltroData.Checked;
+
+            lblFiltroDataFim = new Label();
+            lblFiltroDataFim.Text = "Data Fim:";
+            lblFiltroDataFim.Location = new Point(200, yPos);
+            lblFiltroDataFim.Size = new Size(60, 20);
+            lblFiltroDataFim.Enabled = chkUsarFiltroData.Checked;
+
+            dtpFiltroDataFim = new DateTimePicker();
+            dtpFiltroDataFim.Location = new Point(265, yPos - 3);
+            dtpFiltroDataFim.Size = new Size(110, 23);
+            dtpFiltroDataFim.Format = DateTimePickerFormat.Short;
+            dtpFiltroDataFim.Value = DateTime.Today;
+            dtpFiltroDataFim.Enabled = chkUsarFiltroData.Checked;
+
+            chkUsarFiltroData.CheckedChanged += (s, e) => 
+            {
+                bool enabled = chkUsarFiltroData.Checked;
+                dtpFiltroDataInicio.Enabled = enabled;
+                dtpFiltroDataFim.Enabled = enabled;
+                lblFiltroDataInicio.Enabled = enabled;
+                lblFiltroDataFim.Enabled = enabled;
+            };
+
+            yPos += 30;
+
+            // Filtro de período
+            chkUsarFiltroPeriodo = new CheckBox();
+            chkUsarFiltroPeriodo.Text = "Filtrar por período";
+            chkUsarFiltroPeriodo.Location = new Point(10, yPos);
+            chkUsarFiltroPeriodo.Size = new Size(130, 20);
+            chkUsarFiltroPeriodo.Checked = false;
+
+            yPos += 25;
+
+            lblFiltroPeriodo = new Label();
+            lblFiltroPeriodo.Text = "Período (YYYYMM):";
+            lblFiltroPeriodo.Location = new Point(10, yPos);
+            lblFiltroPeriodo.Size = new Size(120, 20);
+            lblFiltroPeriodo.Enabled = chkUsarFiltroPeriodo.Checked;
+
+            txtFiltroPeriodo = new TextBox();
+            txtFiltroPeriodo.Location = new Point(135, yPos - 3);
+            txtFiltroPeriodo.Size = new Size(100, 23);
+            txtFiltroPeriodo.Enabled = chkUsarFiltroPeriodo.Checked;
+
+            chkUsarFiltroPeriodo.CheckedChanged += (s, e) => 
+            {
+                bool enabled = chkUsarFiltroPeriodo.Checked;
+                txtFiltroPeriodo.Enabled = enabled;
+                lblFiltroPeriodo.Enabled = enabled;
+            };
+
+            yPos += 30;
 
             Button btnFiltrar = new Button();
             btnFiltrar.Text = "Filtrar";
-            btnFiltrar.Location = new Point(190, 46);
-            btnFiltrar.Size = new Size(80, 25);
+            btnFiltrar.Location = new Point(10, yPos);
+            btnFiltrar.Size = new Size(100, 25);
             btnFiltrar.Click += BtnFiltrar_Click;
 
+            yPos += 35;
+
             lstLotes = new ListBox();
-            lstLotes.Location = new Point(10, 75);
+            lstLotes.Location = new Point(10, yPos);
             lstLotes.Size = new Size(330, 200);
             lstLotes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             lstLotes.SelectedIndexChanged += LstLotes_SelectedIndexChanged;
@@ -116,20 +180,21 @@ namespace ExemploAssinadorXML.Forms
 
             btnAtualizarLotes = new Button();
             btnAtualizarLotes.Text = "Atualizar Lista";
-            btnAtualizarLotes.Location = new Point(10, 285);
+            btnAtualizarLotes.Location = new Point(10, yPos + 210);
             btnAtualizarLotes.Size = new Size(150, 30);
             btnAtualizarLotes.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             btnAtualizarLotes.Click += BtnAtualizarLotes_Click;
 
             btnGerarFechamento = new Button();
             btnGerarFechamento.Text = "Gerar Fechamento";
-            btnGerarFechamento.Location = new Point(170, 285);
+            btnGerarFechamento.Location = new Point(170, yPos + 210);
             btnGerarFechamento.Size = new Size(170, 30);
             btnGerarFechamento.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             btnGerarFechamento.Click += BtnGerarFechamento_Click;
 
             grpLotes.Controls.AddRange(new Control[] {
-                chkUsarFiltroData, lblFiltroData, dtpFiltroData, btnFiltrar,
+                chkUsarFiltroData, lblFiltroDataInicio, dtpFiltroDataInicio, lblFiltroDataFim, dtpFiltroDataFim,
+                chkUsarFiltroPeriodo, lblFiltroPeriodo, txtFiltroPeriodo, btnFiltrar,
                 lstLotes, btnAtualizarLotes, btnGerarFechamento
             });
 
@@ -137,12 +202,12 @@ namespace ExemploAssinadorXML.Forms
             grpDetalhes = new GroupBox();
             grpDetalhes.Text = "Detalhes do Lote";
             grpDetalhes.Location = new Point(370, 170);
-            grpDetalhes.Size = new Size(390, 300);
+            grpDetalhes.Size = new Size(390, 420);
             grpDetalhes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
 
             rtbDetalhes = new RichTextBox();
             rtbDetalhes.Location = new Point(10, 25);
-            rtbDetalhes.Size = new Size(370, 270);
+            rtbDetalhes.Size = new Size(370, 390);
             rtbDetalhes.ReadOnly = true;
             rtbDetalhes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
 
@@ -555,16 +620,30 @@ namespace ExemploAssinadorXML.Forms
                     var persistenceService = new EfinanceiraDatabasePersistenceService();
                     DateTime? dataInicio = null;
                     DateTime? dataFim = null;
+                    string periodo = null;
                     
+                    // Aplicar filtro de data se marcado
                     if (chkUsarFiltroData.Checked)
                     {
-                        // Quando filtro está marcado, buscar apenas o dia selecionado
-                        dataInicio = dtpFiltroData.Value.Date;
-                        dataFim = dtpFiltroData.Value.Date.AddDays(1).AddSeconds(-1);
+                        dataInicio = dtpFiltroDataInicio.Value.Date;
+                        dataFim = dtpFiltroDataFim.Value.Date.AddDays(1).AddSeconds(-1);
                     }
-                    // Se filtro não está marcado, passar null para buscar todos os lotes
                     
-                    lotesBancoCarregados = persistenceService.BuscarLotes(dataInicio, dataFim);
+                    // Aplicar filtro de período se marcado
+                    if (chkUsarFiltroPeriodo.Checked && !string.IsNullOrWhiteSpace(txtFiltroPeriodo.Text))
+                    {
+                        periodo = txtFiltroPeriodo.Text.Trim();
+                        // Validar formato do período (YYYYMM)
+                        if (periodo.Length != 6 || !periodo.All(char.IsDigit))
+                        {
+                            MessageBox.Show("Período inválido. Use o formato YYYYMM (ex: 202301, 202402, 202501).", 
+                                "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+                    
+                    // Se nenhum filtro está marcado, buscar todos os lotes
+                    lotesBancoCarregados = persistenceService.BuscarLotes(dataInicio, dataFim, periodo);
                     
                     if (lotesBancoCarregados.Count > 0)
                     {
@@ -583,14 +662,37 @@ namespace ExemploAssinadorXML.Forms
                             string item = $"[{tipoStr}]{retificacaoStr} {protocoloStr} | {periodoStr} | {dataStr}";
                             lstLotes.Items.Add(item);
                         }
-                        MessageBox.Show($"Encontrados {lotesBancoCarregados.Count} lote(s) no banco de dados.", 
+                        
+                        string filtroInfo = "";
+                        if (chkUsarFiltroData.Checked)
+                        {
+                            filtroInfo = $"Data: {dtpFiltroDataInicio.Value:dd/MM/yyyy} a {dtpFiltroDataFim.Value:dd/MM/yyyy}";
+                        }
+                        if (chkUsarFiltroPeriodo.Checked && !string.IsNullOrWhiteSpace(periodo))
+                        {
+                            if (!string.IsNullOrEmpty(filtroInfo)) filtroInfo += " | ";
+                            filtroInfo += $"Período: {periodo}";
+                        }
+                        if (string.IsNullOrEmpty(filtroInfo))
+                        {
+                            filtroInfo = "Todos os lotes";
+                        }
+                        
+                        MessageBox.Show($"Encontrados {lotesBancoCarregados.Count} lote(s) no banco de dados.\n\nFiltro: {filtroInfo}", 
                             "Informação", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     else
                     {
-                        string mensagem = chkUsarFiltroData.Checked 
-                            ? $"Nenhum lote encontrado para a data {dtpFiltroData.Value:dd/MM/yyyy}."
-                            : "Nenhum lote encontrado no banco de dados.";
+                        string mensagem = "Nenhum lote encontrado";
+                        if (chkUsarFiltroData.Checked)
+                        {
+                            mensagem += $" para o período de {dtpFiltroDataInicio.Value:dd/MM/yyyy} a {dtpFiltroDataFim.Value:dd/MM/yyyy}";
+                        }
+                        if (chkUsarFiltroPeriodo.Checked && !string.IsNullOrWhiteSpace(periodo))
+                        {
+                            mensagem += $" com período {periodo}";
+                        }
+                        mensagem += ".";
                         MessageBox.Show(mensagem, "Informação", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }

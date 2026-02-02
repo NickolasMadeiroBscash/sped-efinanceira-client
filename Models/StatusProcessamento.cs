@@ -28,7 +28,8 @@ namespace ExemploAssinadorXML.Models
     {
         Abertura,
         Movimentacao,
-        Fechamento
+        Fechamento,
+        CadastroDeclarante
     }
 
     [Serializable]
