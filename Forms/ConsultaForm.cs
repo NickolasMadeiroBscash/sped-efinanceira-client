@@ -28,8 +28,10 @@ namespace ExemploAssinadorXML.Forms
         private Label lblFiltroDataFim;
         private CheckBox chkUsarFiltroData;
         private CheckBox chkUsarFiltroPeriodo;
-        private TextBox txtFiltroPeriodo;
+        private ComboBox cmbFiltroPeriodo;
         private Label lblFiltroPeriodo;
+        private ComboBox cmbFiltroAmbiente;
+        private Label lblFiltroAmbiente;
 
         private GroupBox grpDetalhes;
         private RichTextBox rtbDetalhes;
@@ -144,22 +146,39 @@ namespace ExemploAssinadorXML.Forms
             yPos += 25;
 
             lblFiltroPeriodo = new Label();
-            lblFiltroPeriodo.Text = "Período (YYYYMM):";
+            lblFiltroPeriodo.Text = "Período:";
             lblFiltroPeriodo.Location = new Point(10, yPos);
-            lblFiltroPeriodo.Size = new Size(120, 20);
+            lblFiltroPeriodo.Size = new Size(70, 20);
             lblFiltroPeriodo.Enabled = chkUsarFiltroPeriodo.Checked;
 
-            txtFiltroPeriodo = new TextBox();
-            txtFiltroPeriodo.Location = new Point(135, yPos - 3);
-            txtFiltroPeriodo.Size = new Size(100, 23);
-            txtFiltroPeriodo.Enabled = chkUsarFiltroPeriodo.Checked;
+            cmbFiltroPeriodo = new ComboBox();
+            cmbFiltroPeriodo.Location = new Point(85, yPos - 3);
+            cmbFiltroPeriodo.Size = new Size(200, 23);
+            cmbFiltroPeriodo.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbFiltroPeriodo.Enabled = chkUsarFiltroPeriodo.Checked;
+            PopularComboPeriodos();
 
             chkUsarFiltroPeriodo.CheckedChanged += (s, e) => 
             {
                 bool enabled = chkUsarFiltroPeriodo.Checked;
-                txtFiltroPeriodo.Enabled = enabled;
+                cmbFiltroPeriodo.Enabled = enabled;
                 lblFiltroPeriodo.Enabled = enabled;
             };
+
+            yPos += 30;
+
+            // Filtro de ambiente
+            lblFiltroAmbiente = new Label();
+            lblFiltroAmbiente.Text = "Ambiente:";
+            lblFiltroAmbiente.Location = new Point(10, yPos);
+            lblFiltroAmbiente.Size = new Size(70, 20);
+
+            cmbFiltroAmbiente = new ComboBox();
+            cmbFiltroAmbiente.Location = new Point(85, yPos - 3);
+            cmbFiltroAmbiente.Size = new Size(150, 23);
+            cmbFiltroAmbiente.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbFiltroAmbiente.Items.AddRange(new object[] { "Ambos", "Teste", "Produção" });
+            cmbFiltroAmbiente.SelectedIndex = 0; // Ambos por padrão
 
             yPos += 30;
 
@@ -194,7 +213,8 @@ namespace ExemploAssinadorXML.Forms
 
             grpLotes.Controls.AddRange(new Control[] {
                 chkUsarFiltroData, lblFiltroDataInicio, dtpFiltroDataInicio, lblFiltroDataFim, dtpFiltroDataFim,
-                chkUsarFiltroPeriodo, lblFiltroPeriodo, txtFiltroPeriodo, btnFiltrar,
+                chkUsarFiltroPeriodo, lblFiltroPeriodo, cmbFiltroPeriodo,
+                lblFiltroAmbiente, cmbFiltroAmbiente, btnFiltrar,
                 lstLotes, btnAtualizarLotes, btnGerarFechamento
             });
 
@@ -630,20 +650,32 @@ namespace ExemploAssinadorXML.Forms
                     }
                     
                     // Aplicar filtro de período se marcado
-                    if (chkUsarFiltroPeriodo.Checked && !string.IsNullOrWhiteSpace(txtFiltroPeriodo.Text))
+                    if (chkUsarFiltroPeriodo.Checked && cmbFiltroPeriodo.SelectedItem != null)
                     {
-                        periodo = txtFiltroPeriodo.Text.Trim();
-                        // Validar formato do período (YYYYMM)
-                        if (periodo.Length != 6 || !periodo.All(char.IsDigit))
-                        {
-                            MessageBox.Show("Período inválido. Use o formato YYYYMM (ex: 202301, 202402, 202501).", 
-                                "Validação", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
+                        // Extrair apenas o período (YYYYMM) do item selecionado
+                        // Formato: "202301 - Jan-Jun/2023" -> "202301"
+                        string itemSelecionado = cmbFiltroPeriodo.SelectedItem.ToString();
+                        periodo = itemSelecionado.Split(' ')[0]; // Pega apenas a primeira parte (YYYYMM)
                     }
                     
-                    // Se nenhum filtro está marcado, buscar todos os lotes
-                    lotesBancoCarregados = persistenceService.BuscarLotes(dataInicio, dataFim, periodo);
+                    // Aplicar filtro de ambiente
+                    string ambiente = null;
+                    if (cmbFiltroAmbiente.SelectedItem != null)
+                    {
+                        string ambienteSelecionado = cmbFiltroAmbiente.SelectedItem.ToString();
+                        if (ambienteSelecionado == "Teste")
+                        {
+                            ambiente = "TEST";
+                        }
+                        else if (ambienteSelecionado == "Produção")
+                        {
+                            ambiente = "PROD";
+                        }
+                        // Se for "Ambos", ambiente permanece null
+                    }
+                    
+                    // Buscar lotes com os filtros aplicados
+                    lotesBancoCarregados = persistenceService.BuscarLotes(dataInicio, dataFim, periodo, ambiente);
                     
                     if (lotesBancoCarregados.Count > 0)
                     {
@@ -673,6 +705,16 @@ namespace ExemploAssinadorXML.Forms
                             if (!string.IsNullOrEmpty(filtroInfo)) filtroInfo += " | ";
                             filtroInfo += $"Período: {periodo}";
                         }
+                        if (!string.IsNullOrEmpty(ambiente))
+                        {
+                            if (!string.IsNullOrEmpty(filtroInfo)) filtroInfo += " | ";
+                            filtroInfo += $"Ambiente: {ambiente}";
+                        }
+                        else if (cmbFiltroAmbiente.SelectedItem != null && cmbFiltroAmbiente.SelectedItem.ToString() == "Ambos")
+                        {
+                            if (!string.IsNullOrEmpty(filtroInfo)) filtroInfo += " | ";
+                            filtroInfo += "Ambiente: Ambos";
+                        }
                         if (string.IsNullOrEmpty(filtroInfo))
                         {
                             filtroInfo = "Todos os lotes";
@@ -691,6 +733,10 @@ namespace ExemploAssinadorXML.Forms
                         if (chkUsarFiltroPeriodo.Checked && !string.IsNullOrWhiteSpace(periodo))
                         {
                             mensagem += $" com período {periodo}";
+                        }
+                        if (!string.IsNullOrEmpty(ambiente))
+                        {
+                            mensagem += $" no ambiente {ambiente}";
                         }
                         mensagem += ".";
                         MessageBox.Show(mensagem, "Informação", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -917,6 +963,46 @@ namespace ExemploAssinadorXML.Forms
             {
                 rtbDetalhes.Clear();
                 rtbDetalhes.AppendText($"Erro ao carregar detalhes: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Popula o ComboBox de períodos com os últimos 5 anos e próximos 5 anos, cada um com 2 semestres
+        /// </summary>
+        private void PopularComboPeriodos()
+        {
+            cmbFiltroPeriodo.Items.Clear();
+            
+            int anoAtual = DateTime.Now.Year;
+            
+            // Adicionar períodos dos últimos 5 anos (5 anos para trás)
+            for (int ano = anoAtual - 5; ano < anoAtual; ano++)
+            {
+                // Primeiro semestre (Jan-Jun) - mês 01 ou 06
+                cmbFiltroPeriodo.Items.Add($"{ano}01 - Jan-Jun/{ano}");
+                cmbFiltroPeriodo.Items.Add($"{ano}06 - Jan-Jun/{ano}");
+                
+                // Segundo semestre (Jul-Dez) - mês 02 ou 12
+                cmbFiltroPeriodo.Items.Add($"{ano}02 - Jul-Dez/{ano}");
+                cmbFiltroPeriodo.Items.Add($"{ano}12 - Jul-Dez/{ano}");
+            }
+            
+            // Adicionar períodos do ano atual
+            cmbFiltroPeriodo.Items.Add($"{anoAtual}01 - Jan-Jun/{anoAtual}");
+            cmbFiltroPeriodo.Items.Add($"{anoAtual}06 - Jan-Jun/{anoAtual}");
+            cmbFiltroPeriodo.Items.Add($"{anoAtual}02 - Jul-Dez/{anoAtual}");
+            cmbFiltroPeriodo.Items.Add($"{anoAtual}12 - Jul-Dez/{anoAtual}");
+            
+            // Adicionar períodos dos próximos 5 anos (5 anos para frente)
+            for (int ano = anoAtual + 1; ano <= anoAtual + 5; ano++)
+            {
+                // Primeiro semestre (Jan-Jun) - mês 01 ou 06
+                cmbFiltroPeriodo.Items.Add($"{ano}01 - Jan-Jun/{ano}");
+                cmbFiltroPeriodo.Items.Add($"{ano}06 - Jan-Jun/{ano}");
+                
+                // Segundo semestre (Jul-Dez) - mês 02 ou 12
+                cmbFiltroPeriodo.Items.Add($"{ano}02 - Jul-Dez/{ano}");
+                cmbFiltroPeriodo.Items.Add($"{ano}12 - Jul-Dez/{ano}");
             }
         }
 

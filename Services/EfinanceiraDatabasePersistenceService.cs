@@ -511,9 +511,9 @@ namespace ExemploAssinadorXML.Services
         }
 
         /// <summary>
-        /// Busca lotes do banco de dados com filtro de data e/ou período
+        /// Busca lotes do banco de dados com filtro de data, período e/ou ambiente
         /// </summary>
-        public List<LoteBancoInfo> BuscarLotes(DateTime? dataInicio = null, DateTime? dataFim = null, string periodo = null, int? limite = null)
+        public List<LoteBancoInfo> BuscarLotes(DateTime? dataInicio = null, DateTime? dataFim = null, string periodo = null, string ambiente = null, int? limite = null)
         {
             List<LoteBancoInfo> lotes = new List<LoteBancoInfo>();
 
@@ -575,6 +575,12 @@ namespace ExemploAssinadorXML.Services
                         whereConditions.Add("l.periodo = @periodo");
                     }
 
+                    // Adicionar filtro de ambiente se informado
+                    if (!string.IsNullOrWhiteSpace(ambiente))
+                    {
+                        whereConditions.Add("l.ambiente = @ambiente");
+                    }
+
                     // Adicionar WHERE se houver condições
                     if (whereConditions.Count > 0)
                     {
@@ -604,6 +610,10 @@ namespace ExemploAssinadorXML.Services
                         if (!string.IsNullOrWhiteSpace(periodo))
                         {
                             command.Parameters.AddWithValue("@periodo", periodo);
+                        }
+                        if (!string.IsNullOrWhiteSpace(ambiente))
+                        {
+                            command.Parameters.AddWithValue("@ambiente", ambiente);
                         }
                         if (limite.HasValue)
                         {

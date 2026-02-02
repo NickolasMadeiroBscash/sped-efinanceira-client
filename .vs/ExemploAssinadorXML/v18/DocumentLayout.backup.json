@@ -22,7 +22,7 @@
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
-      "VerticalTabListWidth": 228,
+      "VerticalTabListWidth": 419,
       "DocumentGroups": [
         {
           "DockedWidth": 200,
@@ -73,7 +73,7 @@
               "RelativeDocumentMoniker": "Services\\EfinanceiraAssinaturaService.cs",
               "ToolTip": "C:\\projetos-bscash-nickolas-madeiro\\assinadorEfinanceira\\Services\\EfinanceiraAssinaturaService.cs",
               "RelativeToolTip": "Services\\EfinanceiraAssinaturaService.cs",
-              "ViewState": "AgIAAOsAAAAAAAAAAAAEwO8AAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAOoAAAAAAAAAAAAAwO8AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-01-30T20:17:37.752Z",
               "EditorCaption": ""
