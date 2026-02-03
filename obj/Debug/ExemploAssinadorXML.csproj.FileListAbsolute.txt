@@ -45,3 +45,6 @@ C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\bin\Debug\Npgsql.xml
 C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\obj\Debug\ExemploA.11A41C0E.Up2Date
 C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\obj\Debug\ExemploAssinadorXML.exe
 C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\obj\Debug\ExemploAssinadorXML.pdb
+C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\bin\Debug\favicon.ico
+C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\bin\Debug\EPPlus.dll
+C:\projetos-bscash-nickolas-madeiro\assinadorEfinanceira\bin\Debug\EPPlus.xml

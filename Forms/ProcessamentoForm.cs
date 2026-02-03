@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using ExemploAssinadorXML.Models;
 using ExemploAssinadorXML.Services;
+using ExemploAssinadorXML;
 
 namespace ExemploAssinadorXML.Forms
 {
@@ -49,6 +50,7 @@ namespace ExemploAssinadorXML.Forms
         private Button btnProcessarMovimentacao;
         private Button btnProcessarFechamento;
         private Button btnProcessarCadastroDeclarante;
+        private Button btnProcessarCompleto;
         private Button btnCancelar;
         private CheckBox chkApenasProcessar;
 
@@ -68,17 +70,249 @@ namespace ExemploAssinadorXML.Forms
         private Label lblLotesComErro;
         private Label lblTempoDecorrido;
         private Label lblTempoEstimado;
+        private Label lblStatusEtapa;
+        private Label lblAberturaFinalizada;
+        private Label lblTempoMedioPorLote;
 
         private readonly StatusProcessamento status;
         private bool cancelarProcessamento = false;
+        private System.Windows.Forms.Timer timerAtualizacao;
+        private bool processamentoAtivo = false;
 
         public ConfiguracaoForm ConfigForm { get; set; }
         public ConsultaForm ConsultaForm { get; set; }
+        public MainForm MainFormParent { get; set; }
+        
+        /// <summary>
+        /// Desabilita todos os controles durante o processamento, exceto o botão Cancelar
+        /// </summary>
+        private void DesabilitarControlesDuranteProcessamento()
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke((MethodInvoker)delegate { DesabilitarControlesDuranteProcessamento(); });
+                return;
+            }
+            
+            // Desabilitar botões de processamento
+            btnProcessarAbertura.Enabled = false;
+            btnProcessarMovimentacao.Enabled = false;
+            btnProcessarFechamento.Enabled = false;
+            btnProcessarCadastroDeclarante.Enabled = false;
+            btnProcessarCompleto.Enabled = false;
+            
+            // Habilitar apenas o botão Cancelar
+            btnCancelar.Enabled = true;
+            
+            // Desabilitar checkbox
+            chkApenasProcessar.Enabled = false;
+            
+            // Desabilitar abas do TabControl principal
+            if (MainFormParent != null && MainFormParent.TabControlPrincipal != null)
+            {
+                foreach (TabPage tab in MainFormParent.TabControlPrincipal.TabPages)
+                {
+                    tab.Enabled = false;
+                }
+                // Manter a aba de Processamento habilitada para ver o progresso
+                if (MainFormParent.TabControlPrincipal.TabPages.Count > 2)
+                {
+                    MainFormParent.TabControlPrincipal.TabPages[2].Enabled = true; // Aba Processamento (índice 2)
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Reabilita todos os controles após o processamento ou cancelamento
+        /// </summary>
+        private void ReabilitarControlesAposProcessamento()
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke((MethodInvoker)delegate { ReabilitarControlesAposProcessamento(); });
+                return;
+            }
+            
+            // Reabilitar botões de processamento
+            btnProcessarAbertura.Enabled = true;
+            btnProcessarMovimentacao.Enabled = true;
+            btnProcessarFechamento.Enabled = true;
+            btnProcessarCadastroDeclarante.Enabled = true;
+            btnProcessarCompleto.Enabled = true;
+            
+            // Desabilitar botão Cancelar
+            btnCancelar.Enabled = false;
+            
+            // Reabilitar checkbox
+            chkApenasProcessar.Enabled = true;
+            
+            // Reabilitar abas do TabControl principal
+            if (MainFormParent != null && MainFormParent.TabControlPrincipal != null)
+            {
+                foreach (TabPage tab in MainFormParent.TabControlPrincipal.TabPages)
+                {
+                    tab.Enabled = true;
+                }
+            }
+        }
 
         public ProcessamentoForm()
         {
             InitializeComponent();
             status = new StatusProcessamento();
+            status.StatusEtapa = 0; // Inicializar como 0 (Aguardando)
+            
+            // Criar timer para atualização em tempo real
+            timerAtualizacao = new System.Windows.Forms.Timer();
+            timerAtualizacao.Interval = 500; // Atualizar a cada 500ms
+            timerAtualizacao.Tick += TimerAtualizacao_Tick;
+        }
+        
+        private void TimerAtualizacao_Tick(object sender, EventArgs e)
+        {
+            if (processamentoAtivo && status.InicioProcessamento != default(DateTime))
+            {
+                // Atualizar tempo decorrido em tempo real
+                status.TempoDecorrido = DateTime.Now - status.InicioProcessamento;
+                this.Invoke((MethodInvoker)delegate
+                {
+                    lblTempoDecorrido.Text = $"Tempo Decorrido: {status.TempoDecorrido:hh\\:mm\\:ss}";
+                    
+                    // Atualizar tempo médio por lote em tempo real durante processamento
+                    if ((status.StatusEtapa == 3 || status.StatusEtapa == 4) && status.TotalLotesMovimentacao > 0)
+                    {
+                        if (status.TemposLotesMovimentacao.Count > 0 && status.LotesMovimentacaoProcessados > 0)
+                        {
+                            TimeSpan tempoTotal = DateTime.Now - status.TemposLotesMovimentacao[0];
+                            TimeSpan tempoMedio = TimeSpan.FromMilliseconds(tempoTotal.TotalMilliseconds / status.LotesMovimentacaoProcessados);
+                            lblTempoMedioPorLote.Text = $"Tempo Médio/Lote: {tempoMedio:mm\\:ss} (calculando...)";
+                        }
+                    }
+                    
+                    // Atualizar barra de progresso com animação marquee quando estiver consultando
+                    if (status.StatusEtapa == 0 || (status.TotalLotes == 0 && processamentoAtivo))
+                    {
+                        if (progressBarGeral.Style != ProgressBarStyle.Marquee)
+                        {
+                            progressBarGeral.Style = ProgressBarStyle.Marquee;
+                            progressBarGeral.MarqueeAnimationSpeed = 30;
+                        }
+                        lblProgressoGeral.Text = "Consultando banco de dados...";
+                    }
+                    else if (status.TotalLotes > 0)
+                    {
+                        if (progressBarGeral.Style != ProgressBarStyle.Continuous)
+                        {
+                            progressBarGeral.Style = ProgressBarStyle.Continuous;
+                        }
+                        int progresso = (int)((double)status.LotesProcessados / status.TotalLotes * 100);
+                        progressBarGeral.Value = Math.Min(Math.Max(progresso, 0), 100);
+                        lblProgressoGeral.Text = $"{progresso}%";
+                    }
+                });
+            }
+        }
+        
+        private void LimparEstatisticas()
+        {
+            status.TotalLotes = 0;
+            status.LotesProcessados = 0;
+            status.LotesAssinados = 0;
+            status.LotesCriptografados = 0;
+            status.LotesEnviados = 0;
+            status.LotesComErro = 0;
+            status.ProtocolosEnviados.Clear();
+            status.StatusEtapa = 0;
+            status.AberturaFinalizada = false;
+            status.LotesMovimentacaoProcessados = 0;
+            status.TotalLotesMovimentacao = 0;
+            status.TempoMedioPorLote = null;
+            status.TemposLotesMovimentacao.Clear();
+            status.EtapaAtual = "Aguardando...";
+            status.MensagemAtual = "-";
+            status.InicioProcessamento = DateTime.Now;
+            status.TempoDecorrido = TimeSpan.Zero;
+            
+            this.Invoke((MethodInvoker)delegate
+            {
+                progressBarGeral.Value = 0;
+                progressBarGeral.Style = ProgressBarStyle.Marquee;
+                progressBarGeral.MarqueeAnimationSpeed = 30;
+                lblProgressoGeral.Text = "Iniciando...";
+                lstLog.Items.Clear();
+                AtualizarEstatisticas();
+            });
+        }
+        
+        private void IniciarProcessamento()
+        {
+            processamentoAtivo = true;
+            timerAtualizacao.Start();
+            LimparEstatisticas();
+        }
+        
+        private void FinalizarProcessamento(bool cancelado = false, string mensagemErro = null)
+        {
+            processamentoAtivo = false;
+            timerAtualizacao.Stop();
+            
+            this.Invoke((MethodInvoker)delegate
+            {
+                // Parar animação marquee
+                if (progressBarGeral.Style == ProgressBarStyle.Marquee)
+                {
+                    progressBarGeral.Style = ProgressBarStyle.Continuous;
+                    progressBarGeral.MarqueeAnimationSpeed = 0;
+                }
+                
+                if (!string.IsNullOrEmpty(mensagemErro))
+                {
+                    // Se houve erro, mostrar mensagem de erro
+                    if (status.TotalLotes > 0)
+                    {
+                        int progresso = (int)((double)status.LotesProcessados / status.TotalLotes * 100);
+                        progressBarGeral.Value = Math.Min(Math.Max(progresso, 0), 100);
+                        lblProgressoGeral.Text = $"Erro ({progresso}%)";
+                    }
+                    else
+                    {
+                        progressBarGeral.Value = 0;
+                        lblProgressoGeral.Text = "Erro";
+                    }
+                    AtualizarEtapa($"Erro: {mensagemErro}");
+                }
+                else if (cancelado)
+                {
+                    // Se foi cancelado, manter o progresso atual e mostrar mensagem
+                    if (status.TotalLotes > 0)
+                    {
+                        int progresso = (int)((double)status.LotesProcessados / status.TotalLotes * 100);
+                        progressBarGeral.Value = Math.Min(Math.Max(progresso, 0), 100);
+                        lblProgressoGeral.Text = $"Cancelado ({progresso}%)";
+                    }
+                    else
+                    {
+                        progressBarGeral.Value = 0;
+                        lblProgressoGeral.Text = "Cancelado";
+                    }
+                    AtualizarEtapa("Processamento cancelado pelo usuário.");
+                }
+                else
+                {
+                    // Se foi finalizado normalmente
+                    if (status.TotalLotes > 0)
+                    {
+                        int progresso = (int)((double)status.LotesProcessados / status.TotalLotes * 100);
+                        progressBarGeral.Value = Math.Min(Math.Max(progresso, 0), 100);
+                        lblProgressoGeral.Text = $"Concluído ({progresso}%)";
+                    }
+                    else
+                    {
+                        progressBarGeral.Value = 100;
+                        lblProgressoGeral.Text = "Concluído (100%)";
+                    }
+                }
+            });
         }
 
         /// <summary>
@@ -194,22 +428,30 @@ namespace ExemploAssinadorXML.Forms
             btnProcessarCadastroDeclarante.Size = new Size(150, 35);
             btnProcessarCadastroDeclarante.Click += BtnProcessarCadastroDeclarante_Click;
 
+            btnProcessarCompleto = new Button();
+            btnProcessarCompleto.Text = "Processar Completo";
+            btnProcessarCompleto.Location = new Point(650, 25);
+            btnProcessarCompleto.Size = new Size(150, 35);
+            btnProcessarCompleto.BackColor = Color.LightGreen;
+            btnProcessarCompleto.Click += BtnProcessarCompleto_Click;
+
             btnCancelar = new Button();
             btnCancelar.Text = "Cancelar";
-            btnCancelar.Location = new Point(650, 25);
+            btnCancelar.Location = new Point(810, 25);
             btnCancelar.Size = new Size(100, 35);
             btnCancelar.Enabled = false;
             btnCancelar.Click += BtnCancelar_Click;
 
             chkApenasProcessar = new CheckBox();
             chkApenasProcessar.Text = "Apenas Processar (não enviar)";
-            chkApenasProcessar.Location = new Point(760, 32);
+            chkApenasProcessar.Location = new Point(920, 32);
             chkApenasProcessar.Size = new Size(200, 20);
-            chkApenasProcessar.Checked = false;
+
+            grpControles.Size = new Size(1130, 80);
 
             grpControles.Controls.AddRange(new Control[] {
                 btnProcessarAbertura, btnProcessarMovimentacao, btnProcessarFechamento,
-                btnProcessarCadastroDeclarante, btnCancelar, chkApenasProcessar
+                btnProcessarCadastroDeclarante, btnProcessarCompleto, btnCancelar, chkApenasProcessar
             });
 
             // Progresso
@@ -298,10 +540,30 @@ namespace ExemploAssinadorXML.Forms
             lblTempoEstimado.Location = new Point(320, 85);
             lblTempoEstimado.Size = new Size(300, 20);
 
+            lblStatusEtapa = new Label();
+            lblStatusEtapa.Text = "Status Etapa: Aguardando";
+            lblStatusEtapa.Location = new Point(10, 115);
+            lblStatusEtapa.Size = new Size(250, 20);
+            lblStatusEtapa.Font = new Font(lblStatusEtapa.Font, FontStyle.Bold);
+            lblStatusEtapa.ForeColor = Color.Blue;
+
+            lblAberturaFinalizada = new Label();
+            lblAberturaFinalizada.Text = "Abertura: Não iniciada";
+            lblAberturaFinalizada.Location = new Point(270, 115);
+            lblAberturaFinalizada.Size = new Size(200, 20);
+
+            lblTempoMedioPorLote = new Label();
+            lblTempoMedioPorLote.Text = "Tempo Médio/Lote: -";
+            lblTempoMedioPorLote.Location = new Point(480, 115);
+            lblTempoMedioPorLote.Size = new Size(250, 20);
+
+            grpEstatisticas.Size = new Size(750, 150);
+
             grpEstatisticas.Controls.AddRange(new Control[] {
                 lblTotalLotes, lblLotesProcessados, lblLotesAssinados,
                 lblLotesCriptografados, lblLotesEnviados, lblLotesComErro,
-                lblTempoDecorrido, lblTempoEstimado
+                lblTempoDecorrido, lblTempoEstimado, lblStatusEtapa,
+                lblAberturaFinalizada, lblTempoMedioPorLote
             });
 
             this.Controls.AddRange(new Control[] {
@@ -324,11 +586,7 @@ namespace ExemploAssinadorXML.Forms
                 return;
             }
 
-            btnProcessarAbertura.Enabled = false;
-            btnProcessarMovimentacao.Enabled = false;
-            btnProcessarFechamento.Enabled = false;
-            btnProcessarCadastroDeclarante.Enabled = false;
-            btnCancelar.Enabled = true;
+            DesabilitarControlesDuranteProcessamento();
             cancelarProcessamento = false;
 
             Task.Run(() => ProcessarAbertura());
@@ -347,14 +605,67 @@ namespace ExemploAssinadorXML.Forms
                 return;
             }
 
-            btnProcessarAbertura.Enabled = false;
-            btnProcessarMovimentacao.Enabled = false;
-            btnProcessarFechamento.Enabled = false;
-            btnProcessarCadastroDeclarante.Enabled = false;
-            btnCancelar.Enabled = true;
+            DesabilitarControlesDuranteProcessamento();
             cancelarProcessamento = false;
 
             Task.Run(() => ProcessarMovimentacao());
+        }
+
+        private void BtnProcessarCompleto_Click(object sender, EventArgs e)
+        {
+            string erro = ValidarPeriodosCompletos();
+            if (!string.IsNullOrEmpty(erro))
+            {
+                MessageBox.Show(erro, "Validação de Períodos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            erro = ValidarDadosAbertura();
+            if (!string.IsNullOrEmpty(erro))
+            {
+                string mensagemFinal = erro.Contains(CAMPO_PREFIXO) || erro.Contains("Aba") 
+                    ? $"{TITULO_CAMPOS_FALTANDO}\n\n{erro}\n\n{MSG_ACESSE_CONFIG}"
+                    : erro;
+                MessageBox.Show(mensagemFinal, TITULO_CAMPOS_FALTANDO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            erro = ValidarDadosFechamento();
+            if (!string.IsNullOrEmpty(erro))
+            {
+                string mensagemFinal = erro.Contains(CAMPO_PREFIXO) || erro.Contains("Aba") 
+                    ? $"{TITULO_CAMPOS_FALTANDO}\n\n{erro}\n\n{MSG_ACESSE_CONFIG}"
+                    : erro;
+                MessageBox.Show(mensagemFinal, TITULO_CAMPOS_FALTANDO, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var resultado = MessageBox.Show(
+                "Deseja processar tudo automaticamente?\n\n" +
+                "O sistema irá:\n" +
+                "1. Processar abertura\n" +
+                "2. Processar todas as movimentações\n" +
+                "3. Processar fechamento\n\n" +
+                "Tudo será feito sequencialmente de forma automatizada.",
+                "Processamento Completo",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (resultado != DialogResult.Yes)
+                return;
+
+            DesabilitarControlesDuranteProcessamento();
+            cancelarProcessamento = false;
+
+            // Resetar status
+            status.StatusEtapa = 0; // Aguardando
+            status.AberturaFinalizada = false;
+            status.LotesMovimentacaoProcessados = 0;
+            status.TotalLotesMovimentacao = 0;
+            status.TempoMedioPorLote = null;
+            status.TemposLotesMovimentacao.Clear();
+
+            Task.Run(() => ProcessarCompleto());
         }
 
         private void BtnProcessarFechamento_Click(object sender, EventArgs e)
@@ -370,11 +681,7 @@ namespace ExemploAssinadorXML.Forms
                 return;
             }
 
-            btnProcessarAbertura.Enabled = false;
-            btnProcessarMovimentacao.Enabled = false;
-            btnProcessarFechamento.Enabled = false;
-            btnProcessarCadastroDeclarante.Enabled = false;
-            btnCancelar.Enabled = true;
+            DesabilitarControlesDuranteProcessamento();
             cancelarProcessamento = false;
 
             Task.Run(() => ProcessarFechamento());
@@ -393,11 +700,7 @@ namespace ExemploAssinadorXML.Forms
                 return;
             }
 
-            btnProcessarAbertura.Enabled = false;
-            btnProcessarMovimentacao.Enabled = false;
-            btnProcessarFechamento.Enabled = false;
-            btnProcessarCadastroDeclarante.Enabled = false;
-            btnCancelar.Enabled = true;
+            DesabilitarControlesDuranteProcessamento();
             cancelarProcessamento = false;
 
             Task.Run(() => ProcessarCadastroDeclarante());
@@ -407,6 +710,8 @@ namespace ExemploAssinadorXML.Forms
         {
             cancelarProcessamento = true;
             AdicionarLog("Processamento cancelado pelo usuário.");
+            FinalizarProcessamento(cancelado: true);
+            ReabilitarControlesAposProcessamento();
         }
 
         private string ValidarDadosAbertura()
@@ -808,14 +1113,110 @@ namespace ExemploAssinadorXML.Forms
             return null;
         }
 
+        /// <summary>
+        /// Converte datas (DtInicio e DtFim) em período YYYYMM
+        /// </summary>
+        private string ConverterDatasParaPeriodo(string dtInicio, string dtFim)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(dtInicio) || string.IsNullOrWhiteSpace(dtFim))
+                    return null;
+
+                DateTime inicio = DateTime.Parse(dtInicio, CULTURE_INFO_PT_BR);
+                DateTime fim = DateTime.Parse(dtFim, CULTURE_INFO_PT_BR);
+
+                int ano = inicio.Year;
+                int mesInicio = inicio.Month;
+                int mesFim = fim.Month;
+
+                // Determinar período baseado nas datas
+                // Primeiro semestre: Jan-Jun (meses 1-6)
+                // Segundo semestre: Jul-Dez (meses 7-12)
+                if (mesInicio >= 1 && mesInicio <= 6 && mesFim >= 1 && mesFim <= 6)
+                {
+                    // Primeiro semestre - usar 01 ou 06
+                    return $"{ano}01";
+                }
+                else if (mesInicio >= 7 && mesInicio <= 12 && mesFim >= 7 && mesFim <= 12)
+                {
+                    // Segundo semestre - usar 02 ou 12
+                    return $"{ano}02";
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Valida se abertura, movimentação e fechamento estão no mesmo período
+        /// </summary>
+        private string ValidarPeriodosCompletos()
+        {
+            if (ConfigForm == null || ConfigForm.Config == null)
+                return "Configuração não inicializada.";
+
+            var config = ConfigForm.Config;
+            var dadosAbertura = ConfigForm.DadosAbertura;
+            var dadosFechamento = ConfigForm.DadosFechamento;
+
+            if (dadosAbertura == null)
+                return "Dados de abertura não configurados.";
+
+            if (dadosFechamento == null)
+                return "Dados de fechamento não configurados.";
+
+            if (string.IsNullOrWhiteSpace(config.Periodo))
+                return "Período não configurado na configuração geral.";
+
+            // Converter datas de abertura em período
+            string periodoAbertura = ConverterDatasParaPeriodo(dadosAbertura.DtInicio, dadosAbertura.DtFim);
+            if (periodoAbertura == null)
+                return "Não foi possível determinar o período das datas de abertura. Verifique se as datas estão corretas.";
+
+            // Converter datas de fechamento em período
+            string periodoFechamento = ConverterDatasParaPeriodo(dadosFechamento.DtInicio, dadosFechamento.DtFim);
+            if (periodoFechamento == null)
+                return "Não foi possível determinar o período das datas de fechamento. Verifique se as datas estão corretas.";
+
+            // Comparar períodos
+            string periodoMovimentacao = config.Periodo.Trim();
+
+            List<string> periodosDiferentes = new List<string>();
+
+            if (periodoAbertura != periodoMovimentacao)
+                periodosDiferentes.Add($"Abertura: {periodoAbertura} (diferente de Movimentação: {periodoMovimentacao})");
+
+            if (periodoFechamento != periodoMovimentacao)
+                periodosDiferentes.Add($"Fechamento: {periodoFechamento} (diferente de Movimentação: {periodoMovimentacao})");
+
+            if (periodoAbertura != periodoFechamento)
+                periodosDiferentes.Add($"Abertura: {periodoAbertura} (diferente de Fechamento: {periodoFechamento})");
+
+            if (periodosDiferentes.Count > 0)
+            {
+                return "Os períodos não estão alinhados!\n\n" +
+                       $"Período Configurado (Movimentação): {periodoMovimentacao}\n" +
+                       $"Período Abertura: {periodoAbertura}\n" +
+                       $"Período Fechamento: {periodoFechamento}\n\n" +
+                       "Por favor, corrija os períodos para que todos sejam iguais antes de usar o processamento completo.\n\n" +
+                       string.Join("\n", periodosDiferentes);
+            }
+
+            return null;
+        }
+
         private async Task ProcessarAbertura()
         {
             try
             {
+                IniciarProcessamento();
                 AtualizarEtapa("Iniciando processamento de abertura...");
-                status.InicioProcessamento = DateTime.Now;
                 status.TotalLotes = 1;
-                status.ProtocolosEnviados.Clear();
 
                 var config = ConfigForm.Config;
                 var dadosAbertura = ConfigForm.DadosAbertura;
@@ -1038,9 +1439,9 @@ namespace ExemploAssinadorXML.Forms
                                 {
                                     persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, 
                                         $"Lote enviado. Protocolo: {protocoloFinal}, Código: {resposta.CodigoResposta}");
-                            }
-                            else
-                            {
+                                }
+                                else
+                                {
                                     persistenceService.RegistrarLogLote(idLoteBanco, "ENVIO_AVISO", 
                                         $"Lote enviado, mas protocolo não retornado. Código: {resposta.CodigoResposta}");
                                 }
@@ -1116,26 +1517,17 @@ namespace ExemploAssinadorXML.Forms
                 AtualizarEtapa("Processamento concluído com sucesso!");
                 AdicionarLog("Processamento de abertura concluído.");
 
-                this.Invoke((MethodInvoker)delegate
-                {
-                    btnProcessarAbertura.Enabled = true;
-                    btnProcessarMovimentacao.Enabled = true;
-                    btnProcessarFechamento.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnCancelar.Enabled = false;
-                });
+                FinalizarProcessamento();
+                ReabilitarControlesAposProcessamento();
             }
             catch (Exception ex)
             {
                 AdicionarLog($"ERRO: {ex.Message}");
                 status.LotesComErro = 1;
+                FinalizarProcessamento(mensagemErro: ex.Message);
+                ReabilitarControlesAposProcessamento();
                 this.Invoke((MethodInvoker)delegate
                 {
-                    btnProcessarAbertura.Enabled = true;
-                    btnProcessarMovimentacao.Enabled = true;
-                    btnProcessarFechamento.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnCancelar.Enabled = false;
                     MessageBox.Show($"Erro ao processar: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
             }
@@ -1145,15 +1537,28 @@ namespace ExemploAssinadorXML.Forms
         {
             try
             {
+                // Verificar se está em modo completo
+                bool modoCompleto = status.ModoCompleto;
+                
+                if (!modoCompleto)
+                {
+                    IniciarProcessamento();
+                }
+                
                 AtualizarEtapa("Iniciando processamento de movimentação...");
-                status.InicioProcessamento = DateTime.Now;
-                status.TotalLotes = 0;
-                status.LotesProcessados = 0;
-                status.LotesAssinados = 0;
-                status.LotesCriptografados = 0;
-                status.LotesEnviados = 0;
-                status.LotesComErro = 0;
-                status.ProtocolosEnviados.Clear();
+                
+                if (!modoCompleto)
+                {
+                    status.TotalLotes = 0;
+                }
+                else
+                {
+                    // Em modo completo, manter contadores mas resetar apenas os de movimentação
+                    status.LotesMovimentacaoProcessados = 0;
+                    status.TotalLotesMovimentacao = 0;
+                    status.TemposLotesMovimentacao.Clear();
+                    status.TemposLotesMovimentacao.Add(DateTime.Now);
+                }
 
                 var config = ConfigForm.Config;
 
@@ -1181,6 +1586,18 @@ namespace ExemploAssinadorXML.Forms
                 
                 DateTime dtInicio = DateTime.Parse(dataInicio, CULTURE_INFO_PT_BR);
                 DateTime dtFim = DateTime.Parse(dataFim, CULTURE_INFO_PT_BR);
+                
+                // Indicar que está consultando o banco
+                AtualizarEtapa("Consultando banco de dados...");
+                this.Invoke((MethodInvoker)delegate
+                {
+                    if (progressBarGeral.Style != ProgressBarStyle.Marquee)
+                    {
+                        progressBarGeral.Style = ProgressBarStyle.Marquee;
+                        progressBarGeral.MarqueeAnimationSpeed = 30;
+                    }
+                    lblProgressoGeral.Text = "Consultando banco de dados...";
+                });
                 
                 AdicionarLog($"Datas parseadas: dtInicio={dtInicio:yyyy-MM-dd}, dtFim={dtFim:yyyy-MM-dd}");
                 
@@ -1217,11 +1634,21 @@ namespace ExemploAssinadorXML.Forms
                 // Testar conexão com banco
                 AtualizarEtapa("Testando conexão com banco de dados...");
                 var dbService = new EfinanceiraDatabaseService();
-                if (!dbService.TestarConexao())
+                try
                 {
-                    throw new InvalidOperationException("Não foi possível conectar ao banco de dados. Verifique as credenciais.");
+                    if (!dbService.TestarConexao())
+                    {
+                        FinalizarProcessamento(mensagemErro: "Não foi possível conectar ao banco de dados");
+                        throw new InvalidOperationException("Não foi possível conectar ao banco de dados. Verifique as credenciais.");
+                    }
+                    AdicionarLog("Conexão com banco de dados estabelecida.");
                 }
-                AdicionarLog("Conexão com banco de dados estabelecida.");
+                catch (Exception exConexao)
+                {
+                    FinalizarProcessamento(mensagemErro: $"Erro ao conectar: {exConexao.Message}");
+                    AdicionarLog($"✗ Erro ao conectar ao banco de dados: {exConexao.Message}");
+                    throw new InvalidOperationException($"Erro ao conectar ao banco de dados: {exConexao.Message}", exConexao);
+                }
 
                 // Buscar pessoas com contas (paginado)
                 AtualizarEtapa("Buscando dados do banco de dados...");
@@ -1233,8 +1660,49 @@ namespace ExemploAssinadorXML.Forms
 
                 while (lotesGerados < maxLotes && !cancelarProcessamento)
                 {
+                    AtualizarEtapa($"Consultando banco de dados (página {lotesGerados + 1})...");
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        if (progressBarGeral.Style != ProgressBarStyle.Marquee)
+                        {
+                            progressBarGeral.Style = ProgressBarStyle.Marquee;
+                            progressBarGeral.MarqueeAnimationSpeed = 30;
+                        }
+                        lblProgressoGeral.Text = $"Consultando banco de dados (página {lotesGerados + 1})...";
+                    });
+                    
                     AdicionarLog($"Buscando página: offset={offset}, limit={pageSize}...");
-                    var pessoas = dbService.BuscarPessoasComContas(ano, mesInicial, mesFinal, pageSize, offset);
+                    
+                    List<DadosPessoaConta> pessoas;
+                    try
+                    {
+                        pessoas = dbService.BuscarPessoasComContas(ano, mesInicial, mesFinal, pageSize, offset);
+                    }
+                    catch (Exception exConsulta)
+                    {
+                        FinalizarProcessamento(mensagemErro: $"Erro ao consultar banco: {exConsulta.Message}");
+                        AdicionarLog($"✗ Erro ao consultar banco de dados: {exConsulta.Message}");
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            MessageBox.Show(
+                                $"Erro ao consultar banco de dados:\n\n{exConsulta.Message}\n\n" +
+                                "O processamento foi interrompido.",
+                                "Erro na Consulta ao Banco",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error
+                            );
+                        });
+                        throw new InvalidOperationException($"Erro ao consultar banco de dados: {exConsulta.Message}", exConsulta);
+                    }
+                    
+                    // Atualizar barra de progresso após consulta
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        if (progressBarGeral.Style == ProgressBarStyle.Marquee && status.TotalLotes > 0)
+                        {
+                            progressBarGeral.Style = ProgressBarStyle.Continuous;
+                        }
+                    });
                     
                     if (pessoas.Count == 0)
                     {
@@ -1280,6 +1748,17 @@ namespace ExemploAssinadorXML.Forms
 
                         lotesGerados++;
                         status.TotalLotes = lotesGerados;
+                        
+                        // Rastrear tempo se estiver em modo completo
+                        DateTime inicioLote = DateTime.Now;
+                        if (modoCompleto)
+                        {
+                            status.TotalLotesMovimentacao = lotesGerados;
+                            if (status.TemposLotesMovimentacao.Count == 0)
+                            {
+                                status.TemposLotesMovimentacao.Add(inicioLote);
+                            }
+                        }
 
                         AtualizarEtapa($"Gerando lote {lotesGerados} ({pessoasLote.Count} eventos)...");
                         
@@ -1532,11 +2011,39 @@ namespace ExemploAssinadorXML.Forms
                                         );
                                         
                                         AtualizarEstatisticas();
+                                        
+                                        // Rastrear tempo final do lote se estiver em modo completo
+                                        if (modoCompleto)
+                                        {
+                                            status.LotesMovimentacaoProcessados++;
+                                            DateTime fimLote = DateTime.Now;
+                                            TimeSpan tempoLote = fimLote - inicioLote;
+                                            if (status.TemposLotesMovimentacao.Count > 0)
+                                            {
+                                                // Calcular tempo médio atualizado
+                                                TimeSpan tempoTotal = fimLote - status.TemposLotesMovimentacao[0];
+                                                status.TempoMedioPorLote = TimeSpan.FromMilliseconds(tempoTotal.TotalMilliseconds / status.LotesMovimentacaoProcessados);
+                                            }
+                                            AtualizarEstatisticas();
+                                        }
                                     }
                                     else
                                     {
                                         // Se não recebeu protocolo, aguardar e tentar novamente ou informar erro
                                         AdicionarLog($"⚠ ATENÇÃO: Lote {lotesGerados} enviado mas protocolo não foi retornado!");
+                                        
+                                        // Rastrear tempo mesmo em caso de erro
+                                        if (modoCompleto)
+                                        {
+                                            status.LotesMovimentacaoProcessados++;
+                                            DateTime fimLote = DateTime.Now;
+                                            if (status.TemposLotesMovimentacao.Count > 0)
+                                            {
+                                                TimeSpan tempoTotal = fimLote - status.TemposLotesMovimentacao[0];
+                                                status.TempoMedioPorLote = TimeSpan.FromMilliseconds(tempoTotal.TotalMilliseconds / status.LotesMovimentacaoProcessados);
+                                            }
+                                            AtualizarEstatisticas();
+                                        }
                                         AdicionarLog($"  Aguardando resposta do servidor...");
                                         
                                         // Tentar aguardar um pouco mais e verificar se há protocolo na resposta XML
@@ -1767,14 +2274,11 @@ namespace ExemploAssinadorXML.Forms
                 AtualizarEtapa("Processamento de movimentação concluído!");
                 AdicionarLog($"Processamento concluído. Total de lotes processados: {status.LotesProcessados}");
 
-                this.Invoke((MethodInvoker)delegate
+                if (!status.ModoCompleto)
                 {
-                    btnProcessarAbertura.Enabled = true;
-                    btnProcessarMovimentacao.Enabled = true;
-                    btnProcessarFechamento.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnCancelar.Enabled = false;
-                });
+                    FinalizarProcessamento();
+                }
+                ReabilitarControlesAposProcessamento();
             }
             catch (Exception ex)
             {
@@ -1784,13 +2288,13 @@ namespace ExemploAssinadorXML.Forms
                     AdicionarLog($"Detalhes: {ex.InnerException.Message}");
                 }
                 status.LotesComErro++;
+                if (!status.ModoCompleto)
+                {
+                    FinalizarProcessamento(mensagemErro: ex.Message);
+                }
+                ReabilitarControlesAposProcessamento();
                 this.Invoke((MethodInvoker)delegate
                 {
-                    btnProcessarAbertura.Enabled = true;
-                    btnProcessarMovimentacao.Enabled = true;
-                    btnProcessarFechamento.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnCancelar.Enabled = false;
                     MessageBox.Show($"Erro ao processar movimentação: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
             }
@@ -1800,10 +2304,9 @@ namespace ExemploAssinadorXML.Forms
         {
             try
             {
+                IniciarProcessamento();
                 AtualizarEtapa("Iniciando processamento de fechamento...");
-                status.InicioProcessamento = DateTime.Now;
                 status.TotalLotes = 1;
-                status.ProtocolosEnviados.Clear();
 
                 var config = ConfigForm.Config;
                 var dadosFechamento = ConfigForm.DadosFechamento;
@@ -2294,28 +2797,1012 @@ namespace ExemploAssinadorXML.Forms
                 AtualizarEtapa("Processamento concluído com sucesso!");
                 AdicionarLog("Processamento de fechamento concluído.");
 
-                this.Invoke((MethodInvoker)delegate
-                {
-                    btnProcessarAbertura.Enabled = true;
-                    btnProcessarMovimentacao.Enabled = true;
-                    btnProcessarFechamento.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnCancelar.Enabled = false;
-                });
+                FinalizarProcessamento();
+                ReabilitarControlesAposProcessamento();
             }
             catch (Exception ex)
             {
                 AdicionarLog($"ERRO: {ex.Message}");
                 status.LotesComErro = 1;
+                FinalizarProcessamento(mensagemErro: ex.Message);
+                ReabilitarControlesAposProcessamento();
                 this.Invoke((MethodInvoker)delegate
                 {
-                    btnProcessarAbertura.Enabled = true;
-                    btnProcessarMovimentacao.Enabled = true;
-                    btnProcessarFechamento.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnCancelar.Enabled = false;
                     MessageBox.Show($"Erro ao processar: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
+            }
+        }
+
+        /// <summary>
+        /// Processa tudo automaticamente: Abertura -> Movimentações -> Fechamento
+        /// Sequência: Processar Abertura -> Enviar Abertura -> Processar Movimentações -> Enviar Movimentações -> Processar Fechamento -> Enviar Fechamento
+        /// </summary>
+        private async Task ProcessarCompleto()
+        {
+            try
+            {
+                IniciarProcessamento();
+                status.ModoCompleto = true;
+                status.StatusEtapa = 0; // Aguardando início
+                status.AberturaFinalizada = false;
+                status.LotesMovimentacaoProcessados = 0;
+                status.TotalLotesMovimentacao = 0;
+                status.TemposLotesMovimentacao.Clear();
+                mapArquivoParaIdLote.Clear();
+                arquivoAberturaCriptografado = null;
+                idLoteAberturaBanco = 0;
+
+                AdicionarLog("════════════════════════════════════════");
+                AdicionarLog("INICIANDO PROCESSAMENTO COMPLETO");
+                AdicionarLog("════════════════════════════════════════");
+
+                // ETAPA 1: PROCESSAR ABERTURA
+                AdicionarLog("\n>>> ETAPA 1: PROCESSANDO ABERTURA <<<");
+                status.StatusEtapa = 1; // Processando Abertura
+                AtualizarEstatisticas();
+
+                await ProcessarAberturaCompleto();
+
+                if (cancelarProcessamento)
+                {
+                    AdicionarLog("Processamento cancelado pelo usuário.");
+                    status.ModoCompleto = false;
+                    FinalizarProcessamento(cancelado: true);
+                    ReabilitarControlesAposProcessamento();
+                    return;
+                }
+                
+                AdicionarLog("✓ Abertura processada com sucesso!");
+
+                // ETAPA 2: ENVIAR ABERTURA E AGUARDAR SUCESSO
+                if (!chkApenasProcessar.Checked)
+                {
+                    AdicionarLog("\n>>> ETAPA 2: ENVIANDO ABERTURA <<<");
+                    status.StatusEtapa = 2; // Abertura Enviada
+                    AtualizarEstatisticas();
+                    
+                    if (string.IsNullOrEmpty(arquivoAberturaCriptografado))
+                    {
+                        throw new Exception("Arquivo de abertura criptografado não foi gerado. Não é possível enviar.");
+                    }
+                    
+                    if (!File.Exists(arquivoAberturaCriptografado))
+                    {
+                        throw new Exception($"Arquivo de abertura não encontrado: {arquivoAberturaCriptografado}");
+                    }
+                    
+                    AdicionarLog($"Arquivo pronto para envio: {Path.GetFileName(arquivoAberturaCriptografado)} ({new FileInfo(arquivoAberturaCriptografado).Length} bytes)");
+                    
+                    bool aberturaEnviada = await EnviarAberturaCompleto();
+
+                    if (!aberturaEnviada)
+                    {
+                        throw new Exception("Falha ao enviar abertura. Processamento completo interrompido.");
+                    }
+                    
+                    AdicionarLog("✓ Abertura enviada com sucesso!");
+                }
+                else
+                {
+                    AdicionarLog("\n>>> ETAPA 2: ENVIO DE ABERTURA PULADO (modo 'Apenas Processar' ativo) <<<");
+                    status.StatusEtapa = 2; // Abertura processada (sem envio)
+                    AtualizarEstatisticas();
+                    AdicionarLog("✓ Abertura processada (envio pulado - modo 'Apenas Processar')");
+                }
+
+                if (cancelarProcessamento)
+                {
+                    AdicionarLog("Processamento cancelado pelo usuário.");
+                    status.ModoCompleto = false;
+                    FinalizarProcessamento(cancelado: true);
+                    ReabilitarControlesAposProcessamento();
+                    return;
+                }
+
+                status.AberturaFinalizada = true;
+                AtualizarEstatisticas();
+
+                // ETAPA 3: VERIFICAR SE ABERTURA FOI ENVIADA ANTES DE PROCESSAR MOVIMENTAÇÕES
+                if (!chkApenasProcessar.Checked)
+                {
+                    AdicionarLog("\n>>> VERIFICANDO SE ABERTURA FOI ENVIADA <<<");
+                    var config = ConfigForm.Config;
+                    string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : AMBIENTE_HOMOLOG;
+                    
+                    AtualizarEtapa("Verificando status da abertura no banco de dados...");
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        if (progressBarGeral.Style != ProgressBarStyle.Marquee)
+                        {
+                            progressBarGeral.Style = ProgressBarStyle.Marquee;
+                            progressBarGeral.MarqueeAnimationSpeed = 30;
+                        }
+                        lblProgressoGeral.Text = "Verificando status da abertura...";
+                    });
+                    
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        bool aberturaEnviada = persistenceService.VerificarAberturaEnviadaParaPeriodo(config.Periodo, ambienteStr);
+                        
+                        if (!aberturaEnviada)
+                        {
+                            // Aguardar um pouco e verificar novamente (pode ser que ainda esteja processando)
+                            AdicionarLog("Aguardando confirmação da abertura...");
+                            await Task.Delay(2000); // Aguardar 2 segundos
+                            aberturaEnviada = persistenceService.VerificarAberturaEnviadaParaPeriodo(config.Periodo, ambienteStr);
+                        }
+                        
+                        // Atualizar barra de progresso após consulta
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            if (progressBarGeral.Style == ProgressBarStyle.Marquee && status.TotalLotes > 0)
+                            {
+                                progressBarGeral.Style = ProgressBarStyle.Continuous;
+                            }
+                        });
+                        
+                        if (!aberturaEnviada)
+                        {
+                            AdicionarLog("⚠ AVISO: Abertura ainda não foi confirmada como enviada no banco.");
+                            AdicionarLog("Continuando processamento de movimentações...");
+                            AdicionarLog("Se ocorrer erro 'Não existe e-Financeira aberta', verifique se a abertura foi realmente enviada e aceita.");
+                        }
+                        else
+                        {
+                            AdicionarLog("✓ Abertura confirmada como enviada. Prosseguindo com movimentações...");
+                        }
+                    }
+                    catch (Exception exConsulta)
+                    {
+                        FinalizarProcessamento(mensagemErro: $"Erro ao verificar abertura: {exConsulta.Message}");
+                        AdicionarLog($"✗ Erro ao verificar abertura no banco de dados: {exConsulta.Message}");
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            MessageBox.Show(
+                                $"Erro ao verificar abertura no banco de dados:\n\n{exConsulta.Message}\n\n" +
+                                "O processamento foi interrompido.",
+                                "Erro na Consulta ao Banco",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error
+                            );
+                        });
+                        throw new InvalidOperationException($"Erro ao verificar abertura no banco de dados: {exConsulta.Message}", exConsulta);
+                    }
+                }
+
+                // ETAPA 3: PROCESSAR TODOS OS LOTES DE MOVIMENTAÇÃO
+                AdicionarLog("\n>>> ETAPA 3: PROCESSANDO LOTES DE MOVIMENTAÇÃO FINANCEIRA <<<");
+                status.StatusEtapa = 3; // Processando lotes de movimentação financeira
+                DateTime inicioMovimentacoes = DateTime.Now;
+                status.TemposLotesMovimentacao.Clear();
+                status.TemposLotesMovimentacao.Add(inicioMovimentacoes);
+                AtualizarEstatisticas();
+
+                List<string> arquivosMovimentacao = await ProcessarMovimentacaoCompleto();
+
+                if (cancelarProcessamento)
+                {
+                    AdicionarLog("Processamento cancelado pelo usuário.");
+                    status.ModoCompleto = false;
+                    FinalizarProcessamento(cancelado: true);
+                    ReabilitarControlesAposProcessamento();
+                    return;
+                }
+
+                AdicionarLog($"✓ {arquivosMovimentacao.Count} lote(s) de movimentação processado(s)!");
+
+                // ETAPA 4: ENVIAR TODOS OS LOTES DE MOVIMENTAÇÃO
+                if (arquivosMovimentacao.Count > 0 && !chkApenasProcessar.Checked)
+                {
+                    AdicionarLog("\n>>> ETAPA 4: ENVIANDO LOTES DE MOVIMENTAÇÃO FINANCEIRA <<<");
+                    status.StatusEtapa = 4; // Enviando lotes de movimentação financeira
+                    AtualizarEstatisticas();
+
+                    await EnviarMovimentacoesCompleto(arquivosMovimentacao);
+
+                    if (cancelarProcessamento)
+                    {
+                        AdicionarLog("Processamento cancelado pelo usuário.");
+                        status.ModoCompleto = false;
+                        FinalizarProcessamento(cancelado: true);
+                        ReabilitarControlesAposProcessamento();
+                        return;
+                    }
+
+                    // Calcular tempo médio por lote
+                    if (status.TotalLotesMovimentacao > 0 && status.LotesMovimentacaoProcessados > 0)
+                    {
+                        TimeSpan tempoTotalMovimentacoes = DateTime.Now - inicioMovimentacoes;
+                        status.TempoMedioPorLote = TimeSpan.FromMilliseconds(tempoTotalMovimentacoes.TotalMilliseconds / status.LotesMovimentacaoProcessados);
+                    }
+                    
+                    AdicionarLog($"✓ {arquivosMovimentacao.Count} lote(s) de movimentação enviado(s)!");
+                }
+                else if (chkApenasProcessar.Checked)
+                {
+                    AdicionarLog("Envio de movimentações não realizado (modo 'Apenas Processar' ativo).");
+                }
+
+                AtualizarEstatisticas();
+
+                // ETAPA 5: PROCESSAR FECHAMENTO
+                AdicionarLog("\n>>> ETAPA 5: PROCESSANDO LOTE DE FECHAMENTO <<<");
+                status.StatusEtapa = 5; // Processando lote de fechamento
+                AtualizarEstatisticas();
+
+                string arquivoFechamento = await ProcessarFechamentoCompleto();
+
+                if (cancelarProcessamento)
+                {
+                    AdicionarLog("Processamento cancelado pelo usuário.");
+                    status.ModoCompleto = false;
+                    FinalizarProcessamento(cancelado: true);
+                    ReabilitarControlesAposProcessamento();
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(arquivoFechamento))
+                {
+                    throw new Exception("Erro: Arquivo de fechamento não foi gerado!");
+                }
+                
+                AdicionarLog("✓ Fechamento processado!");
+
+                // ETAPA 6: ENVIAR FECHAMENTO
+                if (!string.IsNullOrEmpty(arquivoFechamento) && !chkApenasProcessar.Checked)
+                {
+                    AdicionarLog("\n>>> ETAPA 6: ENVIANDO FECHAMENTO <<<");
+                    status.StatusEtapa = 6; // Fechamento Enviado
+                    AtualizarEstatisticas();
+
+                    await EnviarFechamentoCompleto(arquivoFechamento);
+
+                    if (cancelarProcessamento)
+                    {
+                        AdicionarLog("Processamento cancelado pelo usuário.");
+                        status.ModoCompleto = false;
+                        FinalizarProcessamento(cancelado: true);
+                        ReabilitarControlesAposProcessamento();
+                        return;
+                    }
+                    
+                    AdicionarLog("✓ Fechamento enviado com sucesso!");
+                }
+                else if (chkApenasProcessar.Checked)
+                {
+                    AdicionarLog("Envio de fechamento não realizado (modo 'Apenas Processar' ativo).");
+                }
+
+                status.ModoCompleto = false;
+                FinalizarProcessamento();
+                AtualizarEstatisticas();
+
+                // Atualizar lista na aba Consulta
+                if (ConsultaForm != null)
+                {
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        ConsultaForm.AtualizarListaLotes();
+                    });
+                }
+
+                AdicionarLog("\n════════════════════════════════════════");
+                AdicionarLog("PROCESSAMENTO COMPLETO FINALIZADO!");
+                AdicionarLog("════════════════════════════════════════");
+                AdicionarLog($"Total de lotes processados: {status.TotalLotes}");
+                AdicionarLog($"Lotes enviados: {status.LotesEnviados}");
+                AdicionarLog($"Lotes com erro: {status.LotesComErro}");
+                if (status.TempoMedioPorLote.HasValue)
+                {
+                    AdicionarLog($"Tempo médio por lote: {status.TempoMedioPorLote.Value:mm\\:ss}");
+                }
+
+                ReabilitarControlesAposProcessamento();
+                this.Invoke((MethodInvoker)delegate
+                {
+                    string mensagemEstatisticas = "Processamento completo finalizado com sucesso!\n\n";
+                    mensagemEstatisticas += $"════════════════════════════════════════\n";
+                    mensagemEstatisticas += $"ESTATÍSTICAS DO PROCESSAMENTO\n";
+                    mensagemEstatisticas += $"════════════════════════════════════════\n\n";
+                    mensagemEstatisticas += $"Total de Lotes: {status.TotalLotes}\n";
+                    mensagemEstatisticas += $"Lotes Enviados: {status.LotesEnviados}\n";
+                    mensagemEstatisticas += $"Lotes com Erro: {status.LotesComErro}\n";
+                    mensagemEstatisticas += $"Lotes Assinados: {status.LotesAssinados}\n";
+                    mensagemEstatisticas += $"Lotes Criptografados: {status.LotesCriptografados}\n";
+                    if (status.TempoMedioPorLote.HasValue)
+                    {
+                        mensagemEstatisticas += $"Tempo Médio por Lote: {status.TempoMedioPorLote.Value:mm\\:ss}\n";
+                    }
+                    TimeSpan tempoTotal = DateTime.Now - status.InicioProcessamento;
+                    mensagemEstatisticas += $"Tempo Total: {tempoTotal:hh\\:mm\\:ss}\n";
+                    
+                    MessageBox.Show(mensagemEstatisticas, "Processamento Completo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                });
+            }
+            catch (Exception ex)
+            {
+                AdicionarLog($"ERRO no processamento completo: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    AdicionarLog($"Detalhes: {ex.InnerException.Message}");
+                }
+                status.LotesComErro++;
+                status.ModoCompleto = false;
+                FinalizarProcessamento(mensagemErro: ex.Message);
+                AtualizarEstatisticas();
+
+                ReabilitarControlesAposProcessamento();
+                this.Invoke((MethodInvoker)delegate
+                {
+                    MessageBox.Show($"Erro no processamento completo: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                });
+            }
+        }
+
+        // Variáveis temporárias para armazenar arquivos durante processamento completo
+        private string arquivoAberturaCriptografado = null;
+        private long idLoteAberturaBanco = 0; // ID do lote de abertura no banco
+        private Dictionary<string, long> mapArquivoParaIdLote = new Dictionary<string, long>(); // Mapeia arquivo criptografado -> ID do lote no banco
+
+        /// <summary>
+        /// Processa abertura (gera, assina, criptografa) sem enviar - para modo completo
+        /// </summary>
+        private async Task ProcessarAberturaCompleto()
+        {
+            var config = ConfigForm.Config;
+            var dadosAbertura = ConfigForm.DadosAbertura;
+
+            // 1. Gerar XML
+            AtualizarEtapa("Gerando XML de abertura...");
+            var geradorService = new EfinanceiraGeradorXmlService();
+            string arquivoXml = geradorService.GerarXmlAbertura(dadosAbertura, config.DiretorioLotes);
+            AdicionarLog($"XML gerado: {arquivoXml}");
+
+            if (cancelarProcessamento) return;
+
+            // Contar eventos
+            int quantidadeEventos = ProtocoloPersistenciaService.ContarEventosNoXml(arquivoXml);
+
+            // 2. Assinar
+            AtualizarEtapa("Assinando XML...");
+            var assinaturaService = new EfinanceiraAssinaturaService();
+            X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
+            var xmlAssinado = assinaturaService.AssinarEventosDoArquivo(arquivoXml, cert);
+            string arquivoAssinado = arquivoXml.Replace(".xml", SUFIXO_ASSINADO);
+            xmlAssinado.Save(arquivoAssinado);
+            status.LotesAssinados = 1;
+            AtualizarEstatisticas();
+            AdicionarLog($"XML assinado: {arquivoAssinado}");
+
+            if (cancelarProcessamento) return;
+
+            // Registrar lote no banco após gerar XML
+            try
+            {
+                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : AMBIENTE_HOMOLOG;
+                idLoteAberturaBanco = persistenceService.RegistrarLote(
+                    TipoLote.Abertura,
+                    config.Periodo,
+                    quantidadeEventos,
+                    config.CnpjDeclarante,
+                    arquivoXml,
+                    null, // Ainda não assinado
+                    null, // Ainda não criptografado
+                    ambienteStr
+                );
+                persistenceService.RegistrarLogLote(idLoteAberturaBanco, LOG_GERACAO, $"XML gerado: {Path.GetFileName(arquivoXml)}");
+            }
+            catch (Exception exDb)
+            {
+                AdicionarLog($"⚠ Aviso: Erro ao registrar lote no banco: {exDb.Message}");
+            }
+
+            if (cancelarProcessamento) return;
+
+            // 3. Criptografar
+            AtualizarEtapa("Criptografando XML...");
+            var criptografiaService = new EfinanceiraCriptografiaService();
+            arquivoAberturaCriptografado = criptografiaService.CriptografarLote(arquivoAssinado, config.CertServidorThumbprint);
+            status.LotesCriptografados = 1;
+            AtualizarEstatisticas();
+            AdicionarLog($"XML criptografado: {arquivoAberturaCriptografado}");
+            
+            // Verificar se o arquivo foi criado corretamente
+            if (string.IsNullOrEmpty(arquivoAberturaCriptografado))
+            {
+                throw new Exception("Erro: Arquivo criptografado não foi gerado!");
+            }
+            
+            if (!File.Exists(arquivoAberturaCriptografado))
+            {
+                throw new Exception($"Erro: Arquivo criptografado não encontrado: {arquivoAberturaCriptografado}");
+            }
+            
+            AdicionarLog($"✓ Arquivo criptografado verificado: {Path.GetFileName(arquivoAberturaCriptografado)} ({new FileInfo(arquivoAberturaCriptografado).Length} bytes)");
+
+            // Atualizar lote no banco após assinar e criptografar
+            if (idLoteAberturaBanco > 0)
+            {
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    persistenceService.AtualizarLote(idLoteAberturaBanco, STATUS_CRIPTOGRAFADO);
+                    persistenceService.RegistrarLogLote(idLoteAberturaBanco, STATUS_ASSINATURA, $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                    persistenceService.RegistrarLogLote(idLoteAberturaBanco, STATUS_CRIPTOGRAFIA, $"XML criptografado: {Path.GetFileName(arquivoAberturaCriptografado)}");
+                }
+                catch (Exception exDb)
+                {
+                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Envia abertura e retorna true se foi bem-sucedido - para modo completo
+        /// </summary>
+        private async Task<bool> EnviarAberturaCompleto()
+        {
+            if (string.IsNullOrEmpty(arquivoAberturaCriptografado))
+            {
+                AdicionarLog("✗ ERRO: Arquivo de abertura criptografado está vazio!");
+                return false;
+            }
+
+            if (!File.Exists(arquivoAberturaCriptografado))
+            {
+                AdicionarLog($"✗ ERRO: Arquivo de abertura não encontrado: {arquivoAberturaCriptografado}");
+                return false;
+            }
+
+            string arquivoCriptografado = arquivoAberturaCriptografado;
+            var config = ConfigForm.Config;
+            X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
+
+            try
+            {
+                AdicionarLog($"Enviando arquivo: {Path.GetFileName(arquivoCriptografado)}");
+                AdicionarLog($"Tamanho do arquivo: {new FileInfo(arquivoCriptografado).Length} bytes");
+                AtualizarEtapa("Enviando abertura para e-Financeira...");
+                
+                var envioService = new EfinanceiraEnvioService();
+                var resposta = envioService.EnviarLote(arquivoCriptografado, config, cert);
+                
+                AdicionarLog($"Resposta recebida - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                
+                string protocoloFinal = ExtrairProtocolo(resposta);
+                
+                // Se há protocolo, o envio foi bem-sucedido (lote foi recebido pela e-Financeira)
+                // O protocolo é o indicador principal de sucesso, não apenas o código de resposta
+                if (!string.IsNullOrEmpty(protocoloFinal))
+                {
+                    status.LotesEnviados = 1;
+                    if (!status.ProtocolosEnviados.Contains(protocoloFinal))
+                    {
+                        status.ProtocolosEnviados.Add(protocoloFinal);
+                    }
+                    
+                    // Atualizar lote no banco após envio
+                    if (idLoteAberturaBanco > 0)
+                    {
+                        try
+                        {
+                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                            persistenceService.AtualizarLote(
+                                idLoteAberturaBanco,
+                                STATUS_ENVIADO,
+                                protocoloFinal,
+                                resposta.CodigoResposta,
+                                resposta.Descricao,
+                                resposta.XmlCompleto ?? "",
+                                null, null, null,
+                                DateTime.Now,
+                                null,
+                                null
+                            );
+                            persistenceService.RegistrarLogLote(idLoteAberturaBanco, STATUS_ENVIO, $"Abertura enviada. Protocolo: {protocoloFinal}");
+                        }
+                        catch (Exception exDb)
+                        {
+                            AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                        }
+                    }
+                    
+                    AtualizarEstatisticas();
+                    AdicionarLog($"✓ Abertura enviada com sucesso! Protocolo: {protocoloFinal}");
+                    
+                    // Limpar apenas após confirmar sucesso
+                    arquivoAberturaCriptografado = null;
+                    idLoteAberturaBanco = 0;
+                    
+                    return true;
+                }
+                else
+                {
+                    // Sem protocolo = falha no envio
+                    // Atualizar lote no banco com erro
+                    if (idLoteAberturaBanco > 0)
+                    {
+                        try
+                        {
+                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                            persistenceService.AtualizarLote(
+                                idLoteAberturaBanco,
+                                STATUS_REJEITADO,
+                                null,
+                                resposta.CodigoResposta,
+                                resposta.Descricao,
+                                resposta.XmlCompleto ?? "",
+                                null, null, null,
+                                DateTime.Now,
+                                null,
+                                $"Falha no envio: {resposta.Descricao}"
+                            );
+                        }
+                        catch (Exception exDb)
+                        {
+                            AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                        }
+                    }
+                    
+                    AdicionarLog($"✗ Falha ao enviar abertura. Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                    AdicionarLog($"✗ Nenhum protocolo foi retornado pelo servidor.");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                AdicionarLog($"✗ Erro ao enviar abertura: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    AdicionarLog($"  Detalhes: {ex.InnerException.Message}");
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Processa todos os lotes de movimentação e retorna lista de arquivos criptografados - para modo completo
+        /// </summary>
+        private async Task<List<string>> ProcessarMovimentacaoCompleto()
+        {
+            List<string> arquivosCriptografados = new List<string>();
+            var config = ConfigForm.Config;
+
+            // Validar e calcular período
+            string periodoStr = config.Periodo;
+            var (dataInicio, dataFim) = EfinanceiraPeriodoUtil.CalcularPeriodoSemestral(periodoStr);
+            DateTime dtInicio = DateTime.Parse(dataInicio, CULTURE_INFO_PT_BR);
+            DateTime dtFim = DateTime.Parse(dataFim, CULTURE_INFO_PT_BR);
+            int ano = dtInicio.Year;
+            int mesInicial = dtInicio.Month;
+            int mesFinal = dtFim.Month;
+
+            // Buscar pessoas com contas
+            var dbService = new EfinanceiraDatabaseService();
+            int pageSize = config.PageSize;
+            int offset = config.OffsetRegistros;
+            int maxLotes = config.MaxLotes ?? int.MaxValue;
+            int lotesGerados = 0;
+            int eventosOffset = config.EventoOffset - 1;
+            int eventosPorLote = config.EventosPorLote > 0 && config.EventosPorLote <= 50 ? config.EventosPorLote : 50;
+
+            X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
+            var assinaturaService = new EfinanceiraAssinaturaService();
+            var criptografiaService = new EfinanceiraCriptografiaService();
+
+            while (lotesGerados < maxLotes && !cancelarProcessamento)
+            {
+                var pessoas = dbService.BuscarPessoasComContas(ano, mesInicial, mesFinal, pageSize, offset);
+                
+                if (pessoas.Count == 0)
+                {
+                    AdicionarLog("Não há mais registros para processar.");
+                    break;
+                }
+
+                for (int i = eventosOffset; i < pessoas.Count && lotesGerados < maxLotes; i += eventosPorLote)
+                {
+                    if (cancelarProcessamento) break;
+
+                    var pessoasLote = pessoas.Skip(i).Take(eventosPorLote).ToList();
+                    if (pessoasLote.Count == 0) break;
+
+                    lotesGerados++;
+                    status.TotalLotes = lotesGerados;
+                    status.TotalLotesMovimentacao = lotesGerados;
+
+                    AtualizarEtapa($"Processando lote {lotesGerados} de movimentação ({pessoasLote.Count} eventos)...");
+
+                    // Gerar XML
+                    var geradorService = new EfinanceiraGeradorXmlService();
+                    string arquivoXml = geradorService.GerarXmlMovimentacao(
+                        pessoasLote, 
+                        config.CnpjDeclarante, 
+                        periodoStr, 
+                        config.Ambiente == EfinanceiraAmbiente.PROD ? 1 : 2,
+                        eventosOffset,
+                        config.DiretorioLotes
+                    );
+
+                    // Registrar lote no banco após gerar XML
+                    long idLoteBanco = 0;
+                    try
+                    {
+                        var persistenceService = new EfinanceiraDatabasePersistenceService();
+                        string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : AMBIENTE_HOMOLOG;
+                        idLoteBanco = persistenceService.RegistrarLote(
+                            TipoLote.Movimentacao,
+                            periodoStr,
+                            pessoasLote.Count,
+                            config.CnpjDeclarante,
+                            arquivoXml,
+                            null, // Ainda não assinado
+                            null, // Ainda não criptografado
+                            ambienteStr
+                        );
+                        persistenceService.RegistrarEventosDoLote(idLoteBanco, pessoasLote);
+                        persistenceService.RegistrarLogLote(idLoteBanco, LOG_GERACAO, $"XML gerado: {Path.GetFileName(arquivoXml)}");
+                    }
+                    catch (Exception exDb)
+                    {
+                        AdicionarLog($"⚠ Aviso: Erro ao registrar lote no banco: {exDb.Message}");
+                    }
+
+                    // Assinar
+                    var xmlAssinado = assinaturaService.AssinarEventosDoArquivo(arquivoXml, cert);
+                    string arquivoAssinado = arquivoXml.Replace(".xml", SUFIXO_ASSINADO);
+                    xmlAssinado.Save(arquivoAssinado);
+                    status.LotesAssinados++;
+                    AtualizarEstatisticas();
+
+                    // Atualizar lote no banco após assinar
+                    if (idLoteBanco > 0)
+                    {
+                        try
+                        {
+                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                            persistenceService.AtualizarLote(idLoteBanco, STATUS_ASSINADO);
+                            persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ASSINATURA, $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                        }
+                        catch (Exception exDb)
+                        {
+                            AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                        }
+                    }
+
+                    // Criptografar
+                    string arquivoCriptografado = criptografiaService.CriptografarLote(arquivoAssinado, config.CertServidorThumbprint);
+                    status.LotesCriptografados++;
+                    arquivosCriptografados.Add(arquivoCriptografado);
+                    
+                    // Mapear arquivo para ID do lote
+                    if (idLoteBanco > 0)
+                    {
+                        mapArquivoParaIdLote[arquivoCriptografado] = idLoteBanco;
+                    }
+                    
+                    AtualizarEstatisticas();
+
+                    // Atualizar lote no banco após criptografar
+                    if (idLoteBanco > 0)
+                    {
+                        try
+                        {
+                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                            persistenceService.AtualizarLote(idLoteBanco, STATUS_CRIPTOGRAFADO);
+                            persistenceService.RegistrarLogLote(idLoteBanco, STATUS_CRIPTOGRAFIA, $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
+                        }
+                        catch (Exception exDb)
+                        {
+                            AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                        }
+                    }
+
+                    AdicionarLog($"Lote {lotesGerados} processado: {Path.GetFileName(arquivoCriptografado)}");
+                    eventosOffset += pessoasLote.Count;
+                }
+
+                offset += pageSize;
+            }
+
+            return arquivosCriptografados;
+        }
+
+        /// <summary>
+        /// Envia todos os lotes de movimentação - para modo completo
+        /// </summary>
+        private async Task EnviarMovimentacoesCompleto(List<string> arquivosCriptografados)
+        {
+            var config = ConfigForm.Config;
+            X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
+            var envioService = new EfinanceiraEnvioService();
+
+            for (int i = 0; i < arquivosCriptografados.Count; i++)
+            {
+                if (cancelarProcessamento) break;
+
+                string arquivoCriptografado = arquivosCriptografados[i];
+                long idLoteBanco = mapArquivoParaIdLote.ContainsKey(arquivoCriptografado) ? mapArquivoParaIdLote[arquivoCriptografado] : 0;
+                AtualizarEtapa($"Enviando lote {i + 1} de {arquivosCriptografados.Count} de movimentação...");
+
+                try
+                {
+                    var resposta = envioService.EnviarLote(arquivoCriptografado, config, cert);
+                    string protocoloFinal = ExtrairProtocolo(resposta);
+
+                    // Se há protocolo, o envio foi bem-sucedido (lote foi recebido pela e-Financeira)
+                    if (!string.IsNullOrEmpty(protocoloFinal))
+                    {
+                        status.LotesEnviados++;
+                        if (!status.ProtocolosEnviados.Contains(protocoloFinal))
+                        {
+                            status.ProtocolosEnviados.Add(protocoloFinal);
+                        }
+                        
+                        // Atualizar lote no banco após envio
+                        if (idLoteBanco > 0)
+                        {
+                            try
+                            {
+                                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                persistenceService.AtualizarLote(
+                                    idLoteBanco,
+                                    STATUS_ENVIADO,
+                                    protocoloFinal,
+                                    resposta.CodigoResposta,
+                                    resposta.Descricao,
+                                    resposta.XmlCompleto ?? "",
+                                    null, null, null,
+                                    DateTime.Now,
+                                    null,
+                                    null
+                                );
+                                persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, $"Lote enviado. Protocolo: {protocoloFinal}");
+                            }
+                            catch (Exception exDb)
+                            {
+                                AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                            }
+                        }
+                        
+                        AdicionarLog($"✓ Lote {i + 1} enviado com sucesso! Protocolo: {protocoloFinal}");
+                    }
+                    else
+                    {
+                        status.LotesComErro++;
+                        
+                        // Atualizar lote no banco com erro
+                        if (idLoteBanco > 0)
+                        {
+                            try
+                            {
+                                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                                persistenceService.AtualizarLote(
+                                    idLoteBanco,
+                                    STATUS_REJEITADO,
+                                    null,
+                                    resposta.CodigoResposta,
+                                    resposta.Descricao,
+                                    resposta.XmlCompleto ?? "",
+                                    null, null, null,
+                                    DateTime.Now,
+                                    null,
+                                    $"Falha no envio: {resposta.Descricao}"
+                                );
+                            }
+                            catch (Exception exDb)
+                            {
+                                AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                            }
+                        }
+                        
+                        AdicionarLog($"✗ Lote {i + 1} falhou. Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                        AdicionarLog($"✗ Nenhum protocolo foi retornado pelo servidor.");
+                    }
+
+                    status.LotesMovimentacaoProcessados++;
+                    AtualizarEstatisticas();
+                }
+                catch (Exception ex)
+                {
+                    status.LotesComErro++;
+                    AdicionarLog($"✗ Erro ao enviar lote {i + 1}: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Processa fechamento (gera, assina, criptografa) sem enviar - para modo completo
+        /// </summary>
+        private async Task<string> ProcessarFechamentoCompleto()
+        {
+            var config = ConfigForm.Config;
+            var dadosFechamento = ConfigForm.DadosFechamento;
+
+            // 1. Gerar XML
+            AtualizarEtapa("Gerando XML de fechamento...");
+            var geradorService = new EfinanceiraGeradorXmlService();
+            string arquivoXml = geradorService.GerarXmlFechamento(dadosFechamento, config.DiretorioLotes);
+            AdicionarLog($"XML gerado: {arquivoXml}");
+
+            if (cancelarProcessamento) return null;
+
+            // Registrar lote no banco após gerar XML
+            int quantidadeEventos = ProtocoloPersistenciaService.ContarEventosNoXml(arquivoXml);
+            long idLoteBanco = 0;
+            try
+            {
+                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                string ambienteStr = config.Ambiente == EfinanceiraAmbiente.PROD ? "PROD" : AMBIENTE_HOMOLOG;
+                idLoteBanco = persistenceService.RegistrarLote(
+                    TipoLote.Fechamento,
+                    config.Periodo,
+                    quantidadeEventos,
+                    config.CnpjDeclarante,
+                    arquivoXml,
+                    null, // Ainda não assinado
+                    null, // Ainda não criptografado
+                    ambienteStr
+                );
+                persistenceService.RegistrarLogLote(idLoteBanco, LOG_GERACAO, $"XML gerado: {Path.GetFileName(arquivoXml)}");
+            }
+            catch (Exception exDb)
+            {
+                AdicionarLog($"⚠ Aviso: Erro ao registrar lote no banco: {exDb.Message}");
+            }
+
+            // 2. Assinar
+            AtualizarEtapa("Assinando XML...");
+            var assinaturaService = new EfinanceiraAssinaturaService();
+            X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
+            var xmlAssinado = assinaturaService.AssinarEventosDoArquivo(arquivoXml, cert);
+            string arquivoAssinado = arquivoXml.Replace(".xml", SUFIXO_ASSINADO);
+            xmlAssinado.Save(arquivoAssinado);
+            status.LotesAssinados++;
+            AtualizarEstatisticas();
+            AdicionarLog($"XML assinado: {arquivoAssinado}");
+
+            // Atualizar lote no banco após assinar
+            if (idLoteBanco > 0)
+            {
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    persistenceService.AtualizarLote(idLoteBanco, STATUS_ASSINADO);
+                    persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ASSINATURA, $"XML assinado: {Path.GetFileName(arquivoAssinado)}");
+                }
+                catch (Exception exDb)
+                {
+                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                }
+            }
+
+            if (cancelarProcessamento) return null;
+
+            // 3. Criptografar
+            AtualizarEtapa("Criptografando XML...");
+            var criptografiaService = new EfinanceiraCriptografiaService();
+            string arquivoCriptografado = criptografiaService.CriptografarLote(arquivoAssinado, config.CertServidorThumbprint);
+            status.LotesCriptografados++;
+            AtualizarEstatisticas();
+            AdicionarLog($"XML criptografado: {arquivoCriptografado}");
+
+            // Atualizar lote no banco após criptografar
+            if (idLoteBanco > 0)
+            {
+                try
+                {
+                    var persistenceService = new EfinanceiraDatabasePersistenceService();
+                    persistenceService.AtualizarLote(idLoteBanco, STATUS_CRIPTOGRAFADO);
+                    persistenceService.RegistrarLogLote(idLoteBanco, STATUS_CRIPTOGRAFIA, $"XML criptografado: {Path.GetFileName(arquivoCriptografado)}");
+                    // Armazenar ID do lote para atualização após envio
+                    mapArquivoParaIdLote[arquivoCriptografado] = idLoteBanco;
+                }
+                catch (Exception exDb)
+                {
+                    AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                }
+            }
+
+            return arquivoCriptografado;
+        }
+
+        /// <summary>
+        /// Envia fechamento - para modo completo
+        /// </summary>
+        private async Task EnviarFechamentoCompleto(string arquivoCriptografado)
+        {
+            var config = ConfigForm.Config;
+            X509Certificate2 cert = BuscarCertificado(config.CertThumbprint);
+            long idLoteBanco = mapArquivoParaIdLote.ContainsKey(arquivoCriptografado) ? mapArquivoParaIdLote[arquivoCriptografado] : 0;
+
+            try
+            {
+                AtualizarEtapa("Enviando fechamento para e-Financeira...");
+                var envioService = new EfinanceiraEnvioService();
+                var resposta = envioService.EnviarLote(arquivoCriptografado, config, cert);
+                
+                AdicionarLog($"Resposta recebida - Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                
+                string protocoloFinal = ExtrairProtocolo(resposta);
+                
+                // Se há protocolo, o envio foi bem-sucedido (lote foi recebido pela e-Financeira)
+                if (!string.IsNullOrEmpty(protocoloFinal))
+                {
+                    status.LotesEnviados++;
+                    if (!status.ProtocolosEnviados.Contains(protocoloFinal))
+                    {
+                        status.ProtocolosEnviados.Add(protocoloFinal);
+                    }
+                    
+                    // Atualizar lote no banco após envio
+                    if (idLoteBanco > 0)
+                    {
+                        try
+                        {
+                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                            persistenceService.AtualizarLote(
+                                idLoteBanco,
+                                STATUS_ENVIADO,
+                                protocoloFinal,
+                                resposta.CodigoResposta,
+                                resposta.Descricao,
+                                resposta.XmlCompleto ?? "",
+                                null, null, null,
+                                DateTime.Now,
+                                null,
+                                null
+                            );
+                            persistenceService.RegistrarLogLote(idLoteBanco, STATUS_ENVIO, $"Fechamento enviado. Protocolo: {protocoloFinal}");
+                        }
+                        catch (Exception exDb)
+                        {
+                            AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                        }
+                    }
+                    
+                    AtualizarEstatisticas();
+                    AdicionarLog($"✓ Fechamento enviado com sucesso! Protocolo: {protocoloFinal}");
+                }
+                else
+                {
+                    status.LotesComErro++;
+                    
+                    // Atualizar lote no banco com erro
+                    if (idLoteBanco > 0)
+                    {
+                        try
+                        {
+                            var persistenceService = new EfinanceiraDatabasePersistenceService();
+                            persistenceService.AtualizarLote(
+                                idLoteBanco,
+                                STATUS_REJEITADO,
+                                null,
+                                resposta.CodigoResposta,
+                                resposta.Descricao,
+                                resposta.XmlCompleto ?? "",
+                                null, null, null,
+                                DateTime.Now,
+                                null,
+                                $"Falha no envio: {resposta.Descricao}"
+                            );
+                        }
+                        catch (Exception exDb)
+                        {
+                            AdicionarLog($"⚠ Aviso: Erro ao atualizar lote no banco: {exDb.Message}");
+                        }
+                    }
+                    
+                    AdicionarLog($"✗ Falha ao enviar fechamento. Código: {resposta.CodigoResposta}, Descrição: {resposta.Descricao}");
+                    AdicionarLog($"✗ Nenhum protocolo foi retornado pelo servidor.");
+                }
+            }
+            catch (Exception ex)
+            {
+                status.LotesComErro++;
+                AdicionarLog($"✗ Erro ao enviar fechamento: {ex.Message}");
             }
         }
 
@@ -2592,28 +4079,15 @@ namespace ExemploAssinadorXML.Forms
                 AtualizarEtapa("Processamento concluído!");
                 AdicionarLog("✓ Processamento de cadastro de declarante concluído com sucesso!");
 
-                this.Invoke((MethodInvoker)delegate
-                {
-                    btnProcessarAbertura.Enabled = true;
-                    btnProcessarMovimentacao.Enabled = true;
-                    btnProcessarFechamento.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnCancelar.Enabled = false;
-                });
+                ReabilitarControlesAposProcessamento();
             }
             catch (Exception ex)
             {
                 AdicionarLog($"ERRO: {ex.Message}");
                 status.LotesComErro = 1;
+                ReabilitarControlesAposProcessamento();
                 this.Invoke((MethodInvoker)delegate
                 {
-                    btnProcessarAbertura.Enabled = true;
-                    btnProcessarMovimentacao.Enabled = true;
-                    btnProcessarFechamento.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnProcessarCadastroDeclarante.Enabled = true;
-                    btnCancelar.Enabled = false;
                     MessageBox.Show($"Erro ao processar: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
             }
@@ -2707,6 +4181,99 @@ namespace ExemploAssinadorXML.Forms
                 }
                 
                 lblLotesComErro.Text = $"Com Erro: {status.LotesComErro}";
+
+                // Atualizar status de etapa (0-6)
+                string textoEtapa = "";
+                Color corEtapa = Color.Black;
+                
+                if (status.ModoCompleto)
+                {
+                    switch (status.StatusEtapa)
+                    {
+                        case 0:
+                            textoEtapa = "0 - Aguardando início do processamento";
+                            corEtapa = Color.Gray;
+                            break;
+                        case 1:
+                            textoEtapa = "1 - Processando Abertura";
+                            corEtapa = Color.Blue;
+                            break;
+                        case 2:
+                            textoEtapa = "2 - Abertura Enviada";
+                            corEtapa = Color.Green;
+                            break;
+                        case 3:
+                            textoEtapa = "3 - Processando lotes de movimentação financeira";
+                            corEtapa = Color.Orange;
+                            break;
+                        case 4:
+                            textoEtapa = "4 - Enviando lotes de movimentação financeira";
+                            corEtapa = Color.DarkOrange;
+                            break;
+                        case 5:
+                            textoEtapa = "5 - Processando lote de fechamento";
+                            corEtapa = Color.Purple;
+                            break;
+                        case 6:
+                            textoEtapa = "6 - Fechamento Enviado";
+                            corEtapa = Color.Green;
+                            break;
+                        default:
+                            textoEtapa = "Status desconhecido";
+                            corEtapa = Color.Black;
+                            break;
+                    }
+                }
+                else
+                {
+                    // Quando não está em modo completo, usar EtapaAtual (string)
+                    textoEtapa = string.IsNullOrEmpty(status.EtapaAtual) ? "Aguardando..." : status.EtapaAtual;
+                    corEtapa = Color.Black;
+                }
+                
+                lblStatusEtapa.Text = $"Status Etapa: {textoEtapa}";
+                lblStatusEtapa.ForeColor = corEtapa;
+
+                // Atualizar status de abertura
+                if (status.AberturaFinalizada || status.StatusEtapa >= 2)
+                {
+                    lblAberturaFinalizada.Text = "Abertura: ✓ Finalizada";
+                    lblAberturaFinalizada.ForeColor = Color.Green;
+                }
+                else if (status.StatusEtapa == 1)
+                {
+                    lblAberturaFinalizada.Text = "Abertura: Em processamento...";
+                    lblAberturaFinalizada.ForeColor = Color.Blue;
+                }
+                else
+                {
+                    lblAberturaFinalizada.Text = "Abertura: Não iniciada";
+                    lblAberturaFinalizada.ForeColor = Color.Gray;
+                }
+
+                // Atualizar tempo médio por lote
+                if (status.TempoMedioPorLote.HasValue && status.TempoMedioPorLote.Value.TotalMilliseconds > 0)
+                {
+                    lblTempoMedioPorLote.Text = $"Tempo Médio/Lote: {status.TempoMedioPorLote.Value:mm\\:ss}";
+                }
+                else if ((status.StatusEtapa == 3 || status.StatusEtapa == 4) && status.TotalLotesMovimentacao > 0)
+                {
+                    // Calcular tempo médio em tempo real durante processamento
+                    if (status.TemposLotesMovimentacao.Count > 0 && status.LotesMovimentacaoProcessados > 0)
+                    {
+                        TimeSpan tempoTotal = DateTime.Now - status.TemposLotesMovimentacao[0];
+                        TimeSpan tempoMedio = TimeSpan.FromMilliseconds(tempoTotal.TotalMilliseconds / status.LotesMovimentacaoProcessados);
+                        lblTempoMedioPorLote.Text = $"Tempo Médio/Lote: {tempoMedio:mm\\:ss} (calculando...)";
+                    }
+                    else
+                    {
+                        lblTempoMedioPorLote.Text = $"Tempo Médio/Lote: Calculando...";
+                    }
+                }
+                else
+                {
+                    lblTempoMedioPorLote.Text = "Tempo Médio/Lote: -";
+                }
 
                 if (status.TotalLotes > 0)
                 {

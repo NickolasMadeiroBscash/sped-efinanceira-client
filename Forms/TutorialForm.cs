@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace ExemploAssinadorXML.Forms
@@ -8,6 +9,7 @@ namespace ExemploAssinadorXML.Forms
     {
         private RichTextBox rtbTutorial;
         private Panel panelHeader;
+        private PictureBox picLogoBScash;
 
         public TutorialForm()
         {
@@ -31,6 +33,60 @@ namespace ExemploAssinadorXML.Forms
             lblTitulo.Location = new Point(20, 15);
             lblTitulo.AutoSize = true;
             panelHeader.Controls.Add(lblTitulo);
+            
+            // Logo BScash no header
+            picLogoBScash = new PictureBox();
+            picLogoBScash.SizeMode = PictureBoxSizeMode.Zoom;
+            picLogoBScash.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            picLogoBScash.Size = new Size(120, 50);
+            picLogoBScash.Location = new Point(panelHeader.Width - 130, 5);
+            picLogoBScash.BackColor = Color.Transparent;
+            
+            // Tentar carregar logo de arquivo ou recurso
+            try
+            {
+                string logoPath = Path.Combine(Application.StartupPath, "logo_bscash.png");
+                if (File.Exists(logoPath))
+                {
+                    picLogoBScash.Image = Image.FromFile(logoPath);
+                }
+                else
+                {
+                    // Se não encontrar, criar um placeholder com texto
+                    Bitmap bmp = new Bitmap(120, 50);
+                    using (Graphics g = Graphics.FromImage(bmp))
+                    {
+                        g.Clear(Color.Transparent);
+                        using (Font font = new Font("Arial", 12, FontStyle.Bold))
+                        {
+                            g.DrawString("BSCASH", font, Brushes.White, new PointF(10, 15));
+                        }
+                    }
+                    picLogoBScash.Image = bmp;
+                }
+            }
+            catch
+            {
+                // Em caso de erro, criar placeholder
+                Bitmap bmp = new Bitmap(120, 50);
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.Clear(Color.Transparent);
+                    using (Font font = new Font("Arial", 12, FontStyle.Bold))
+                    {
+                        g.DrawString("BSCASH", font, Brushes.White, new PointF(10, 15));
+                    }
+                }
+                picLogoBScash.Image = bmp;
+            }
+            
+            panelHeader.Controls.Add(picLogoBScash);
+            
+            // Ajustar posição da logo quando o panel for redimensionado
+            panelHeader.Resize += (s, e) => 
+            {
+                picLogoBScash.Location = new Point(panelHeader.Width - 130, 5);
+            };
 
             // RichTextBox para o tutorial
             rtbTutorial = new RichTextBox();

@@ -20,7 +20,9 @@ namespace ExemploAssinadorXML.Services
             const string DB_USER = "nickolas.oliveira";
             const string DB_PASSWORD = "1QclT+-IVB2B";
 
-            _connectionString = $"Host={DB_HOST};Port={DB_PORT};Database={DB_NAME};Username={DB_USER};Password={DB_PASSWORD};Timeout=30;Command Timeout=60;";
+            // Timeout de conexão otimizado: 15 segundos (suficiente para conexão)
+            // Command Timeout será definido por comando individualmente
+            _connectionString = $"Host={DB_HOST};Port={DB_PORT};Database={DB_NAME};Username={DB_USER};Password={DB_PASSWORD};Timeout=15;Pooling=true;MinPoolSize=1;MaxPoolSize=20;";
         }
 
         public EfinanceiraDatabaseService(string connectionString)
@@ -91,6 +93,24 @@ namespace ExemploAssinadorXML.Services
             System.Diagnostics.Debug.WriteLine("");
             
             string sql = @"
+                WITH contas_com_movimentacao AS (
+                    -- Primeiro: identificar contas que têm movimentação no período (mais eficiente)
+                    SELECT DISTINCT ex.idconta
+                    FROM conta.tb_extrato ex
+                    WHERE ex.dataoperacao >= @dataInicio
+                      AND ex.dataoperacao <= @dataFim
+                ),
+                totais_extrato AS (
+                    -- Segundo: calcular totais apenas para contas que têm movimentação
+                    SELECT 
+                        ex.idconta,
+                        COALESCE(SUM(CASE WHEN ex.naturezaoperacao = 'C' THEN ex.valoroperacao ELSE 0 END), 0) as TotCreditos,
+                        COALESCE(SUM(CASE WHEN ex.naturezaoperacao = 'D' THEN ex.valoroperacao ELSE 0 END), 0) as TotDebitos
+                    FROM conta.tb_extrato ex
+                    WHERE ex.dataoperacao >= @dataInicio
+                      AND ex.dataoperacao <= @dataFim
+                    GROUP BY ex.idconta
+                )
                 SELECT 
                     p.idpessoa as IdPessoa,
                     p.documento as Documento,
@@ -110,24 +130,19 @@ namespace ExemploAssinadorXML.Services
                     COALESCE(e.cep, '') as Cep,
                     COALESCE(e.tipologradouro, '') as TipoLogradouro,
                     '' as EnderecoLivre,
-                    COALESCE(SUM(CASE WHEN ex.naturezaoperacao = 'C' THEN ex.valoroperacao ELSE 0 END), 0) as TotCreditos,
-                    COALESCE(SUM(CASE WHEN ex.naturezaoperacao = 'D' THEN ex.valoroperacao ELSE 0 END), 0) as TotDebitos
+                    COALESCE(te.TotCreditos, 0) as TotCreditos,
+                    COALESCE(te.TotDebitos, 0) as TotDebitos
                 FROM manager.tb_pessoa p
                 INNER JOIN manager.tb_pessoafisica pf ON pf.idpessoa = p.idpessoa
                 INNER JOIN conta.tb_conta c ON c.idpessoa = p.idpessoa
-                INNER JOIN conta.tb_extrato ex ON ex.idconta = c.idconta
+                INNER JOIN contas_com_movimentacao ccm ON ccm.idconta = c.idconta
+                LEFT JOIN totais_extrato te ON te.idconta = c.idconta
                 LEFT JOIN manager.tb_endereco e ON e.idpessoa = p.idpessoa AND e.situacao = '1'
                 WHERE p.situacao = '1'
                   AND c.situacao = '1'
                   AND pf.cpf IS NOT NULL
-                  AND pf.cpf != ''
+                  AND TRIM(pf.cpf) != ''
                   AND LENGTH(TRIM(pf.cpf)) >= 11
-                  AND EXTRACT(YEAR FROM ex.dataoperacao) = @ano
-                  AND EXTRACT(MONTH FROM ex.dataoperacao) BETWEEN @mesInicial AND @mesFinal
-                GROUP BY 
-                    p.idpessoa, p.documento, p.nome, pf.cpf, pf.nacionalidade, p.telefone, p.email,
-                    c.idconta, c.numeroconta, c.digitoconta, c.saldoatual,
-                    e.logradouro, e.numero, e.complemento, e.bairro, e.cep, e.tipologradouro
                 ORDER BY p.idpessoa
                 LIMIT @limit OFFSET @offset";
 
@@ -143,13 +158,16 @@ namespace ExemploAssinadorXML.Services
 
                     using (var command = new NpgsqlCommand(sql, connection))
                     {
-                        // Configurar timeout maior para consultas complexas
-                        command.CommandTimeout = 300; // 5 minutos
+                        // Timeout otimizado: reduzido para 120 segundos (2 minutos) já que a consulta está otimizada
+                        command.CommandTimeout = 120;
+                        
+                        // Calcular datas para filtro eficiente (permite uso de índices)
+                        DateTime dataInicio = new DateTime(ano, mesInicial, 1);
+                        DateTime dataFim = new DateTime(ano, mesFinal, DateTime.DaysInMonth(ano, mesFinal), 23, 59, 59);
                         
                         // Especificar tipos explicitamente para evitar problemas de inferência
-                        command.Parameters.Add(new NpgsqlParameter("@ano", NpgsqlDbType.Integer) { Value = ano });
-                        command.Parameters.Add(new NpgsqlParameter("@mesInicial", NpgsqlDbType.Integer) { Value = mesInicial });
-                        command.Parameters.Add(new NpgsqlParameter("@mesFinal", NpgsqlDbType.Integer) { Value = mesFinal });
+                        command.Parameters.Add(new NpgsqlParameter("@dataInicio", NpgsqlDbType.Timestamp) { Value = dataInicio });
+                        command.Parameters.Add(new NpgsqlParameter("@dataFim", NpgsqlDbType.Timestamp) { Value = dataFim });
                         command.Parameters.Add(new NpgsqlParameter("@limit", NpgsqlDbType.Integer) { Value = limit });
                         command.Parameters.Add(new NpgsqlParameter("@offset", NpgsqlDbType.Integer) { Value = offset });
 
@@ -283,14 +301,18 @@ namespace ExemploAssinadorXML.Services
             System.Diagnostics.Debug.WriteLine($"Mês Final: {mesFinal}");
             System.Diagnostics.Debug.WriteLine("");
 
+            // Otimização: usar comparação direta de datas ao invés de EXTRACT para permitir uso de índices
+            DateTime dataInicio = new DateTime(ano, mesInicial, 1);
+            DateTime dataFim = new DateTime(ano, mesFinal, DateTime.DaysInMonth(ano, mesFinal), 23, 59, 59);
+            
             string sql = @"
                 SELECT 
                     COALESCE(SUM(CASE WHEN e.naturezaoperacao = 'C' THEN e.valoroperacao ELSE 0 END), 0) as TotCreditos,
                     COALESCE(SUM(CASE WHEN e.naturezaoperacao = 'D' THEN e.valoroperacao ELSE 0 END), 0) as TotDebitos
                 FROM conta.tb_extrato e
                 WHERE e.idconta = @idConta
-                  AND EXTRACT(YEAR FROM e.dataoperacao) = @ano
-                  AND EXTRACT(MONTH FROM e.dataoperacao) BETWEEN @mesInicial AND @mesFinal";
+                  AND e.dataoperacao >= @dataInicio
+                  AND e.dataoperacao <= @dataFim";
 
             try
             {
@@ -300,10 +322,12 @@ namespace ExemploAssinadorXML.Services
 
                     using (var command = new NpgsqlCommand(sql, connection))
                     {
-                        command.Parameters.AddWithValue("@idConta", idConta);
-                        command.Parameters.AddWithValue("@ano", ano);
-                        command.Parameters.AddWithValue("@mesInicial", mesInicial);
-                        command.Parameters.AddWithValue("@mesFinal", mesFinal);
+                        // Timeout otimizado
+                        command.CommandTimeout = 60;
+                        
+                        command.Parameters.Add(new NpgsqlParameter("@idConta", NpgsqlDbType.Bigint) { Value = idConta });
+                        command.Parameters.Add(new NpgsqlParameter("@dataInicio", NpgsqlDbType.Timestamp) { Value = dataInicio });
+                        command.Parameters.Add(new NpgsqlParameter("@dataFim", NpgsqlDbType.Timestamp) { Value = dataFim });
 
                         using (var reader = command.ExecuteReader())
                         {

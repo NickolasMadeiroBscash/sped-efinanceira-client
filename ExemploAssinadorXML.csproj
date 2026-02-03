@@ -102,6 +102,10 @@
       <HintPath>packages\Npgsql.6.0.11\lib\netstandard2.0\Npgsql.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="EPPlus, Version=4.5.3.3, Culture=neutral, PublicKeyToken=ea159fdaa78159a1, processorArchitecture=MSIL">
+      <HintPath>packages\EPPlus.4.5.3.3\lib\net40\EPPlus.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ExemploAssinadorXML.cs">
@@ -128,6 +132,7 @@
     <Compile Include="Services\EfinanceiraPeriodoUtil.cs" />
     <Compile Include="Services\EfinanceiraDatabaseService.cs" />
     <Compile Include="Services\EfinanceiraDatabasePersistenceService.cs" />
+    <Compile Include="Services\EfinanceiraExportacaoExcelService.cs" />
     <Compile Include="Services\RSAPKCS1SHA256SignatureDescription.cs" />
     <Compile Include="Services\ConfiguracaoPersistenciaService.cs" />
     <Compile Include="Services\ProtocoloPersistenciaService.cs" />
@@ -175,6 +180,14 @@
   <ItemGroup>
     <Content Include="LoteExemplo.xml" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="favicon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <PropertyGroup>
+    <ApplicationIcon>favicon.ico</ApplicationIcon>
+  </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

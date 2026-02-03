@@ -17,10 +17,22 @@ namespace ExemploAssinadorXML.Models
         public TimeSpan TempoDecorrido { get; set; }
         public TimeSpan? TempoEstimadoRestante { get; set; }
         public List<string> ProtocolosEnviados { get; set; }
+        
+        // Campos para processamento completo
+        public int StatusEtapa { get; set; } // 0=Aguardando, 1=Processando Abertura, 2=Abertura Enviada, 3=Processando Movimentação, 4=Enviando Movimentação, 5=Processando Fechamento, 6=Fechamento Enviado
+        public bool AberturaFinalizada { get; set; }
+        public int LotesMovimentacaoProcessados { get; set; }
+        public int TotalLotesMovimentacao { get; set; }
+        public TimeSpan? TempoMedioPorLote { get; set; }
+        public List<DateTime> TemposLotesMovimentacao { get; set; }
+        public bool ModoCompleto { get; set; } // Indica se está em modo de processamento completo
 
         public StatusProcessamento()
         {
             ProtocolosEnviados = new List<string>();
+            TemposLotesMovimentacao = new List<DateTime>();
+            StatusEtapa = 0; // Aguardando início
+            ModoCompleto = false;
         }
     }
 

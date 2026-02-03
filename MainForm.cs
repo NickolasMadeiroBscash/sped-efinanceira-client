@@ -1,4 +1,6 @@
 using System;
+using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 using ExemploAssinadorXML.Forms;
 
@@ -16,6 +18,8 @@ namespace ExemploAssinadorXML
         private ConfiguracaoForm configuracaoForm;
         private ProcessamentoForm processamentoForm;
         private ConsultaForm consultaForm;
+        
+        public TabControl TabControlPrincipal { get { return tabControl; } }
 
         public MainForm()
         {
@@ -92,6 +96,7 @@ namespace ExemploAssinadorXML
             processamentoForm.FormBorderStyle = FormBorderStyle.None;
             processamentoForm.ConfigForm = configuracaoForm;
             processamentoForm.ConsultaForm = consultaForm;
+            processamentoForm.MainFormParent = this;
             tabProcessamento.Controls.Add(processamentoForm);
             processamentoForm.Show();
 

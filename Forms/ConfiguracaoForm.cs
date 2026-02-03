@@ -521,6 +521,12 @@ namespace ExemploAssinadorXML.Forms
         {
             bool isProducao = cmbAmbiente.SelectedItem.ToString() == "PROD";
             
+            // Desabilitar botão de limpar dados se não for ambiente de testes
+            if (btnLimparDadosTeste != null)
+            {
+                btnLimparDadosTeste.Enabled = !isProducao;
+            }
+            
             if (isProducao)
             {
                 // Valores padrão para produção
@@ -548,7 +554,8 @@ namespace ExemploAssinadorXML.Forms
             int yPos = 10;
 
             // Dados Básicos
-            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(1200, 180) };
+            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(scrollAbertura.Width - 30, 180) };
+            grpBasicos.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             yPos += 190;
 
             // Cálculo Automático de Período
@@ -657,19 +664,22 @@ namespace ExemploAssinadorXML.Forms
             CalcularPeriodoAbertura();
 
             // ResponsavelRMF
-            var grpRMF = new GroupBox { Text = "Responsável RMF", Location = new Point(10, yPos), Size = new Size(1200, 200) };
+            var grpRMF = new GroupBox { Text = "Responsável RMF", Location = new Point(10, yPos), Size = new Size(scrollAbertura.Width - 30, 200) };
+            grpRMF.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             yPos += 210;
 
             CriarCamposResponsavelRMF(grpRMF, 10);
 
             // RespeFin
-            var grpRespeFin = new GroupBox { Text = "Responsável e-Financeira", Location = new Point(10, yPos), Size = new Size(1200, 220) };
+            var grpRespeFin = new GroupBox { Text = "Responsável e-Financeira", Location = new Point(10, yPos), Size = new Size(scrollAbertura.Width - 30, 220) };
+            grpRespeFin.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             yPos += 230;
 
             CriarCamposRespeFin(grpRespeFin, 10);
 
             // RepresLegal
-            var grpRepresLegal = new GroupBox { Text = "Representante Legal", Location = new Point(10, yPos), Size = new Size(1200, 140) };
+            var grpRepresLegal = new GroupBox { Text = "Representante Legal", Location = new Point(10, yPos), Size = new Size(scrollAbertura.Width - 30, 140) };
+            grpRepresLegal.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             CriarCamposRepresLegal(grpRepresLegal, 10);
 
@@ -900,7 +910,8 @@ namespace ExemploAssinadorXML.Forms
             scrollFechamento = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
             int yPos = 10;
 
-            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(1200, 360) };
+            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(scrollFechamento.Width - 30, 360) };
+            grpBasicos.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             // Cálculo Automático de Período
             chkCalcularPeriodoFechamento = new CheckBox 
@@ -1107,7 +1118,8 @@ namespace ExemploAssinadorXML.Forms
             scrollCadastroDeclarante = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
             int yPos = 10;
 
-            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(1200, 400) };
+            var grpBasicos = new GroupBox { Text = "Dados Básicos", Location = new Point(10, yPos), Size = new Size(scrollCadastroDeclarante.Width - 30, 400) };
+            grpBasicos.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             // Campos básicos do ideEvento
             var lblTipoAmbiente = new Label { Text = "Tipo Ambiente:", Location = new Point(10, 25), Size = new Size(100, 20) };
@@ -1991,6 +2003,13 @@ namespace ExemploAssinadorXML.Forms
             chkModoTeste.Checked = config.ModoTeste;
             chkHabilitarEnvio.Checked = config.TestEnvioHabilitado;
             txtDiretorioLotes.Text = config.DiretorioLotes ?? "";
+            
+            // Desabilitar botão de limpar dados se não for ambiente de testes
+            if (btnLimparDadosTeste != null)
+            {
+                bool isProducao = config.Ambiente == EfinanceiraAmbiente.PROD;
+                btnLimparDadosTeste.Enabled = !isProducao;
+            }
             
             // Carregar período e preencher semestre/ano se houver
             string periodoSalvo = config.Periodo ?? "";

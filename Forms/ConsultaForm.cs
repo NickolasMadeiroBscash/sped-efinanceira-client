@@ -35,6 +35,7 @@ namespace ExemploAssinadorXML.Forms
 
         private GroupBox grpDetalhes;
         private RichTextBox rtbDetalhes;
+        private Button btnBaixarExcel;
         private List<LoteInfo> lotesCarregados;
         private List<LoteBancoInfo> lotesBancoCarregados;
 
@@ -53,7 +54,7 @@ namespace ExemploAssinadorXML.Forms
             grpConsulta = new GroupBox();
             grpConsulta.Text = "Consulta por Protocolo";
             grpConsulta.Location = new Point(10, 10);
-            grpConsulta.Size = new Size(750, 150);
+            grpConsulta.Size = new Size(820, 150);
             grpConsulta.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             var lblProtocolo = new Label();
@@ -69,16 +70,32 @@ namespace ExemploAssinadorXML.Forms
             btnConsultar.Text = "Consultar";
             btnConsultar.Location = new Point(605, 21);
             btnConsultar.Size = new Size(100, 25);
+            btnConsultar.Enabled = false; // Iniciar desabilitado
             btnConsultar.Click += BtnConsultar_Click;
+
+            btnBaixarExcel = new Button();
+            btnBaixarExcel.Text = "📥 Baixar Excel";
+            btnBaixarExcel.Location = new Point(710, 21);
+            btnBaixarExcel.Size = new Size(100, 25);
+            btnBaixarExcel.Enabled = false; // Iniciar desabilitado
+            btnBaixarExcel.Click += BtnBaixarExcel_Click;
+
+            // Habilitar botões quando houver texto no protocolo
+            txtProtocolo.TextChanged += (s, e) =>
+            {
+                bool temTexto = !string.IsNullOrWhiteSpace(txtProtocolo.Text);
+                btnConsultar.Enabled = temTexto;
+                btnBaixarExcel.Enabled = temTexto;
+            };
 
             rtbResultado = new RichTextBox();
             rtbResultado.Location = new Point(10, 55);
-            rtbResultado.Size = new Size(730, 90);
+            rtbResultado.Size = new Size(800, 90);
             rtbResultado.ReadOnly = true;
             rtbResultado.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
             grpConsulta.Controls.AddRange(new Control[] {
-                lblProtocolo, txtProtocolo, btnConsultar, rtbResultado
+                lblProtocolo, txtProtocolo, btnConsultar, btnBaixarExcel, rtbResultado
             });
 
             // Lista de Lotes
@@ -107,20 +124,22 @@ namespace ExemploAssinadorXML.Forms
 
             dtpFiltroDataInicio = new DateTimePicker();
             dtpFiltroDataInicio.Location = new Point(85, yPos - 3);
-            dtpFiltroDataInicio.Size = new Size(110, 23);
+            dtpFiltroDataInicio.Size = new Size(200, 23);
             dtpFiltroDataInicio.Format = DateTimePickerFormat.Short;
             dtpFiltroDataInicio.Value = DateTime.Today;
             dtpFiltroDataInicio.Enabled = chkUsarFiltroData.Checked;
 
+            yPos += 30;
+
             lblFiltroDataFim = new Label();
             lblFiltroDataFim.Text = "Data Fim:";
-            lblFiltroDataFim.Location = new Point(200, yPos);
-            lblFiltroDataFim.Size = new Size(60, 20);
+            lblFiltroDataFim.Location = new Point(10, yPos);
+            lblFiltroDataFim.Size = new Size(70, 20);
             lblFiltroDataFim.Enabled = chkUsarFiltroData.Checked;
 
             dtpFiltroDataFim = new DateTimePicker();
-            dtpFiltroDataFim.Location = new Point(265, yPos - 3);
-            dtpFiltroDataFim.Size = new Size(110, 23);
+            dtpFiltroDataFim.Location = new Point(85, yPos - 3);
+            dtpFiltroDataFim.Size = new Size(200, 23);
             dtpFiltroDataFim.Format = DateTimePickerFormat.Short;
             dtpFiltroDataFim.Value = DateTime.Today;
             dtpFiltroDataFim.Enabled = chkUsarFiltroData.Checked;
@@ -142,6 +161,7 @@ namespace ExemploAssinadorXML.Forms
             chkUsarFiltroPeriodo.Location = new Point(10, yPos);
             chkUsarFiltroPeriodo.Size = new Size(130, 20);
             chkUsarFiltroPeriodo.Checked = false;
+            chkUsarFiltroPeriodo.Visible = true;
 
             yPos += 25;
 
@@ -150,12 +170,14 @@ namespace ExemploAssinadorXML.Forms
             lblFiltroPeriodo.Location = new Point(10, yPos);
             lblFiltroPeriodo.Size = new Size(70, 20);
             lblFiltroPeriodo.Enabled = chkUsarFiltroPeriodo.Checked;
+            lblFiltroPeriodo.Visible = true;
 
             cmbFiltroPeriodo = new ComboBox();
             cmbFiltroPeriodo.Location = new Point(85, yPos - 3);
             cmbFiltroPeriodo.Size = new Size(200, 23);
             cmbFiltroPeriodo.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbFiltroPeriodo.Enabled = chkUsarFiltroPeriodo.Checked;
+            cmbFiltroPeriodo.Visible = true;
             PopularComboPeriodos();
 
             chkUsarFiltroPeriodo.CheckedChanged += (s, e) => 
@@ -190,23 +212,38 @@ namespace ExemploAssinadorXML.Forms
 
             yPos += 35;
 
+            // Panel com scroll para a lista de lotes
+            Panel panelLotes = new Panel();
+            panelLotes.Location = new Point(10, yPos);
+            panelLotes.Size = new Size(330, 200);
+            panelLotes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            panelLotes.AutoScroll = true;
+            panelLotes.BorderStyle = BorderStyle.FixedSingle;
+
             lstLotes = new ListBox();
-            lstLotes.Location = new Point(10, yPos);
-            lstLotes.Size = new Size(330, 200);
-            lstLotes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            lstLotes.Dock = DockStyle.Fill;
             lstLotes.SelectedIndexChanged += LstLotes_SelectedIndexChanged;
             lstLotes.DoubleClick += LstLotes_DoubleClick;
+            lstLotes.IntegralHeight = false; // Permite scroll quando necessário
+            
+            panelLotes.Controls.Add(lstLotes);
+            
+            // Ajustar altura do ListBox quando o panel for redimensionado
+            panelLotes.Resize += (s, e) => 
+            {
+                lstLotes.Height = panelLotes.ClientSize.Height;
+            };
 
             btnAtualizarLotes = new Button();
             btnAtualizarLotes.Text = "Atualizar Lista";
-            btnAtualizarLotes.Location = new Point(10, yPos + 210);
+            btnAtualizarLotes.Location = new Point(10, yPos + 205);
             btnAtualizarLotes.Size = new Size(150, 30);
             btnAtualizarLotes.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             btnAtualizarLotes.Click += BtnAtualizarLotes_Click;
 
             btnGerarFechamento = new Button();
             btnGerarFechamento.Text = "Gerar Fechamento";
-            btnGerarFechamento.Location = new Point(170, yPos + 210);
+            btnGerarFechamento.Location = new Point(170, yPos + 205);
             btnGerarFechamento.Size = new Size(170, 30);
             btnGerarFechamento.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             btnGerarFechamento.Click += BtnGerarFechamento_Click;
@@ -215,7 +252,7 @@ namespace ExemploAssinadorXML.Forms
                 chkUsarFiltroData, lblFiltroDataInicio, dtpFiltroDataInicio, lblFiltroDataFim, dtpFiltroDataFim,
                 chkUsarFiltroPeriodo, lblFiltroPeriodo, cmbFiltroPeriodo,
                 lblFiltroAmbiente, cmbFiltroAmbiente, btnFiltrar,
-                lstLotes, btnAtualizarLotes, btnGerarFechamento
+                panelLotes, btnAtualizarLotes, btnGerarFechamento
             });
 
             // Detalhes
@@ -230,6 +267,9 @@ namespace ExemploAssinadorXML.Forms
             rtbDetalhes.Size = new Size(370, 390);
             rtbDetalhes.ReadOnly = true;
             rtbDetalhes.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            rtbDetalhes.WordWrap = false; // Desabilitar quebra de linha para permitir scroll horizontal
+            rtbDetalhes.ScrollBars = RichTextBoxScrollBars.Both; // Habilitar scroll vertical e horizontal
+            rtbDetalhes.DetectUrls = false;
 
             grpDetalhes.Controls.Add(rtbDetalhes);
 
@@ -665,7 +705,7 @@ namespace ExemploAssinadorXML.Forms
                         string ambienteSelecionado = cmbFiltroAmbiente.SelectedItem.ToString();
                         if (ambienteSelecionado == "Teste")
                         {
-                            ambiente = "TEST";
+                            ambiente = "TEST"; // Será tratado no serviço para buscar também HOMOLOG
                         }
                         else if (ambienteSelecionado == "Produção")
                         {
@@ -675,11 +715,25 @@ namespace ExemploAssinadorXML.Forms
                     }
                     
                     // Buscar lotes com os filtros aplicados
-                    lotesBancoCarregados = persistenceService.BuscarLotes(dataInicio, dataFim, periodo, ambiente);
+                    var todosLotes = persistenceService.BuscarLotes(dataInicio, dataFim, periodo, ambiente);
+                    
+                    // Garantir que sempre pegue apenas os lotes mais recentes de cada tipo
+                    // Se houver múltiplos lotes do mesmo tipo no mesmo período, pegar apenas o mais recente
+                    // Isso é importante para casos de teste onde pode limpar dados e enviar novamente
+                    var lotesAgrupados = todosLotes
+                        .GroupBy(l => new { l.Periodo, l.TipoLote })
+                        .Select(g => g.OrderByDescending(l => l.DataCriacao).First())
+                        .ToList();
+                    
+                    // Ordenar por tipo (Abertura primeiro, depois Movimentação, depois Fechamento) e depois por data
+                    lotesBancoCarregados = lotesAgrupados
+                        .OrderByDescending(l => l.DataCriacao)
+                        .OrderBy(l => l.TipoLote == TipoLote.Abertura ? 1 : l.TipoLote == TipoLote.Movimentacao ? 2 : 3)
+                        .ToList();
                     
                     if (lotesBancoCarregados.Count > 0)
                     {
-                        foreach (var lote in lotesBancoCarregados.OrderByDescending(l => l.DataCriacao))
+                        foreach (var lote in lotesBancoCarregados)
                         {
                             string tipoStr = lote.TipoLote.ToString();
                             string protocoloStr = !string.IsNullOrEmpty(lote.ProtocoloEnvio) 
@@ -920,7 +974,7 @@ namespace ExemploAssinadorXML.Forms
                     if (!string.IsNullOrEmpty(lote.ProtocoloEnvio))
                     {
                         txtProtocolo.Text = lote.ProtocoloEnvio;
-                        rtbDetalhes.AppendText($"\n[Protocolo preenchido automaticamente - clique em 'Consultar' para verificar status]\n");
+                        rtbDetalhes.AppendText($"\n[Protocolo preenchido automaticamente - clique em 'Consultar' ou 'Baixar Excel' para verificar status]\n");
                 }
                 else
                 {
@@ -978,31 +1032,36 @@ namespace ExemploAssinadorXML.Forms
             // Adicionar períodos dos últimos 5 anos (5 anos para trás)
             for (int ano = anoAtual - 5; ano < anoAtual; ano++)
             {
-                // Primeiro semestre (Jan-Jun) - mês 01 ou 06
+                // Primeiro semestre (Jan-Jun) - período YYYY01
                 cmbFiltroPeriodo.Items.Add($"{ano}01 - Jan-Jun/{ano}");
-                cmbFiltroPeriodo.Items.Add($"{ano}06 - Jan-Jun/{ano}");
                 
-                // Segundo semestre (Jul-Dez) - mês 02 ou 12
+                // Segundo semestre (Jul-Dez) - período YYYY02
                 cmbFiltroPeriodo.Items.Add($"{ano}02 - Jul-Dez/{ano}");
-                cmbFiltroPeriodo.Items.Add($"{ano}12 - Jul-Dez/{ano}");
             }
             
             // Adicionar períodos do ano atual
             cmbFiltroPeriodo.Items.Add($"{anoAtual}01 - Jan-Jun/{anoAtual}");
-            cmbFiltroPeriodo.Items.Add($"{anoAtual}06 - Jan-Jun/{anoAtual}");
             cmbFiltroPeriodo.Items.Add($"{anoAtual}02 - Jul-Dez/{anoAtual}");
-            cmbFiltroPeriodo.Items.Add($"{anoAtual}12 - Jul-Dez/{anoAtual}");
+            
+            // Selecionar o período atual por padrão
+            int mesAtual = DateTime.Now.Month;
+            if (mesAtual >= 1 && mesAtual <= 6)
+            {
+                cmbFiltroPeriodo.SelectedIndex = cmbFiltroPeriodo.Items.Count - 2; // Primeiro semestre
+            }
+            else
+            {
+                cmbFiltroPeriodo.SelectedIndex = cmbFiltroPeriodo.Items.Count - 1; // Segundo semestre
+            }
             
             // Adicionar períodos dos próximos 5 anos (5 anos para frente)
             for (int ano = anoAtual + 1; ano <= anoAtual + 5; ano++)
             {
-                // Primeiro semestre (Jan-Jun) - mês 01 ou 06
+                // Primeiro semestre (Jan-Jun) - período YYYY01
                 cmbFiltroPeriodo.Items.Add($"{ano}01 - Jan-Jun/{ano}");
-                cmbFiltroPeriodo.Items.Add($"{ano}06 - Jan-Jun/{ano}");
                 
-                // Segundo semestre (Jul-Dez) - mês 02 ou 12
+                // Segundo semestre (Jul-Dez) - período YYYY02
                 cmbFiltroPeriodo.Items.Add($"{ano}02 - Jul-Dez/{ano}");
-                cmbFiltroPeriodo.Items.Add($"{ano}12 - Jul-Dez/{ano}");
             }
         }
 
@@ -1016,6 +1075,120 @@ namespace ExemploAssinadorXML.Forms
 
             var form = new GerarFechamentoForm(ConfigForm);
             form.ShowDialog();
+        }
+
+        private void BtnBaixarExcel_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtProtocolo.Text))
+            {
+                MessageBox.Show("Informe o protocolo para exportar os dados.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                // Buscar lote pelo protocolo
+                var persistenceService = new EfinanceiraDatabasePersistenceService();
+                var lote = persistenceService.BuscarLotePorProtocolo(txtProtocolo.Text.Trim());
+
+                if (lote == null)
+                {
+                    MessageBox.Show(
+                        $"Nenhum lote encontrado com o protocolo: {txtProtocolo.Text}\n\n" +
+                        "Verifique se o protocolo está correto e se o lote foi registrado no banco de dados.",
+                        "Lote não encontrado",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                    return;
+                }
+
+                // Perguntar ao usuário onde salvar o arquivo
+                using (var saveDialog = new SaveFileDialog())
+                {
+                    string nomeArquivo = !string.IsNullOrEmpty(lote.Periodo)
+                        ? $"eFinanceira_Periodo_{lote.Periodo}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"
+                        : $"eFinanceira_Lote_{lote.IdLote}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+                    
+                    saveDialog.Filter = "Arquivos Excel (*.xlsx)|*.xlsx|Todos os arquivos (*.*)|*.*";
+                    saveDialog.FileName = nomeArquivo;
+                    saveDialog.Title = "Salvar arquivo Excel";
+
+                    if (saveDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        string caminhoArquivo;
+                        var exportacaoService = new EfinanceiraExportacaoExcelService();
+
+                        if (!string.IsNullOrEmpty(lote.Periodo))
+                        {
+                            // Exportar todo o período (abertura, movimentações, fechamento)
+                            string diretorio = Path.GetDirectoryName(saveDialog.FileName);
+                            caminhoArquivo = exportacaoService.ExportarPeriodoParaExcel(
+                                lote.Periodo,
+                                lote.Ambiente ?? "PROD",
+                                diretorio
+                            );
+
+                            // Mover para o local escolhido pelo usuário
+                            if (caminhoArquivo != saveDialog.FileName && File.Exists(caminhoArquivo))
+                            {
+                                if (File.Exists(saveDialog.FileName))
+                                    File.Delete(saveDialog.FileName);
+                                File.Move(caminhoArquivo, saveDialog.FileName);
+                                caminhoArquivo = saveDialog.FileName;
+                            }
+                        }
+                        else
+                        {
+                            // Exportar apenas o lote específico
+                            string diretorio = Path.GetDirectoryName(saveDialog.FileName);
+                            caminhoArquivo = exportacaoService.ExportarLoteParaExcel(
+                                lote.IdLote,
+                                diretorio
+                            );
+
+                            // Mover para o local escolhido pelo usuário
+                            if (caminhoArquivo != saveDialog.FileName && File.Exists(caminhoArquivo))
+                            {
+                                if (File.Exists(saveDialog.FileName))
+                                    File.Delete(saveDialog.FileName);
+                                File.Move(caminhoArquivo, saveDialog.FileName);
+                                caminhoArquivo = saveDialog.FileName;
+                            }
+                        }
+
+                        MessageBox.Show(
+                            $"Arquivo Excel gerado com sucesso!\n\n" +
+                            $"Local: {caminhoArquivo}\n\n" +
+                            $"O arquivo contém todas as informações do período, incluindo:\n" +
+                            $"• Abertura (se disponível)\n" +
+                            $"• Movimentações financeiras\n" +
+                            $"• Fechamento (se disponível)\n" +
+                            $"• Detalhes de todos os eventos\n" +
+                            $"• Status e retornos do servidor",
+                            "Exportação Concluída",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information
+                        );
+
+                        // Opcional: abrir o arquivo
+                        if (MessageBox.Show("Deseja abrir o arquivo agora?", "Abrir Arquivo", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                        {
+                            System.Diagnostics.Process.Start(caminhoArquivo);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Erro ao gerar arquivo Excel:\n\n{ex.Message}\n\n" +
+                    $"Detalhes: {ex.StackTrace}",
+                    "Erro na Exportação",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
         }
 
         /// <summary>

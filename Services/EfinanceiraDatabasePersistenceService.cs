@@ -356,9 +356,10 @@ namespace ExemploAssinadorXML.Services
                     Nome = pessoa.Nome,
                     NumeroConta = numeroConta,
                     DigitoConta = pessoa.DigitoConta,
-                    SaldoAtual = pessoa.SaldoAtual,
-                    TotCreditos = pessoa.TotCreditos,
-                    TotDebitos = pessoa.TotDebitos,
+                    // Garantir que os valores monetários sejam salvos corretamente (conversão explícita de decimal para decimal?)
+                    SaldoAtual = (decimal?)pessoa.SaldoAtual,
+                    TotCreditos = (decimal?)pessoa.TotCreditos,
+                    TotDebitos = (decimal?)pessoa.TotDebitos,
                     IdEventoXml = idEventoXml,
                     StatusEvento = "GERADO",
                     OcorrenciasJson = null,
@@ -578,7 +579,15 @@ namespace ExemploAssinadorXML.Services
                     // Adicionar filtro de ambiente se informado
                     if (!string.IsNullOrWhiteSpace(ambiente))
                     {
-                        whereConditions.Add("l.ambiente = @ambiente");
+                        // Se for "TEST", buscar tanto "TEST" quanto "HOMOLOG" (são a mesma coisa)
+                        if (ambiente.ToUpper() == "TEST" || ambiente.ToUpper() == "TESTE")
+                        {
+                            whereConditions.Add("(l.ambiente = 'TEST' OR l.ambiente = 'HOMOLOG')");
+                        }
+                        else
+                        {
+                            whereConditions.Add("l.ambiente = @ambiente");
+                        }
                     }
 
                     // Adicionar WHERE se houver condições
@@ -611,7 +620,8 @@ namespace ExemploAssinadorXML.Services
                         {
                             command.Parameters.AddWithValue("@periodo", periodo);
                         }
-                        if (!string.IsNullOrWhiteSpace(ambiente))
+                        // Só adicionar parâmetro de ambiente se não for TEST (pois TEST usa valores literais no SQL)
+                        if (!string.IsNullOrWhiteSpace(ambiente) && ambiente.ToUpper() != "TEST" && ambiente.ToUpper() != "TESTE")
                         {
                             command.Parameters.AddWithValue("@ambiente", ambiente);
                         }
@@ -827,6 +837,69 @@ namespace ExemploAssinadorXML.Services
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Verifica se existe uma abertura enviada e aceita para um período
+        /// </summary>
+        public bool VerificarAberturaEnviadaParaPeriodo(string periodo, string ambiente)
+        {
+            try
+            {
+                using (var connection = new NpgsqlConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    // Buscar a abertura mais recente do período
+                    string sql = @"
+                        SELECT 
+                            l.idlote,
+                            l.protocoloenvio,
+                            l.codigorespostaenvio,
+                            l.codigorespostaconsulta,
+                            l.caminhoarquivolotexml
+                        FROM efinanceira.tb_efinanceira_lote l
+                        WHERE l.periodo = @periodo
+                          AND l.ambiente = @ambiente
+                          AND (
+                              LOWER(l.caminhoarquivolotexml) LIKE '%abertura%' OR
+                              LOWER(l.caminhoarquivolotexml) LIKE '%abert%'
+                          )
+                        ORDER BY l.datacriacao DESC
+                        LIMIT 1";
+
+                    using (var command = new NpgsqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@periodo", periodo);
+                        command.Parameters.AddWithValue("@ambiente", ambiente);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                string protocolo = GetSafeString(reader, "protocoloenvio");
+                                int? codigoRespostaEnvio = GetSafeIntNullable(reader, "codigorespostaenvio");
+                                int? codigoRespostaConsulta = GetSafeIntNullable(reader, "codigorespostaconsulta");
+                                
+                                // Considerar enviada se tiver protocolo E (código de resposta de envio ou consulta indicando sucesso)
+                                // Códigos: 1 = processando, 2 = sucesso, 3 = sucesso com erros
+                                bool temProtocolo = !string.IsNullOrEmpty(protocolo);
+                                bool respostaOk = (codigoRespostaEnvio.HasValue && (codigoRespostaEnvio == 1 || codigoRespostaEnvio == 2)) ||
+                                                 (codigoRespostaConsulta.HasValue && (codigoRespostaConsulta == 1 || codigoRespostaConsulta == 2));
+                                
+                                return temProtocolo && respostaOk;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Erro ao verificar abertura enviada: {ex.Message}");
+                return false;
+            }
+
+            return false;
         }
 
         // Métodos auxiliares
